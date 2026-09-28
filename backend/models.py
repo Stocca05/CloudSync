@@ -266,3 +266,50 @@ class DisconnectRemoteRequest(BaseModel):
     """Request to remove/disconnect a remote."""
 
     remote: str = Field(description="Remote name to disconnect (e.g. gdrive or icloud)")
+
+
+class GoogleInteractiveStartResponse(BaseModel):
+    """Response returned upon starting the 1-click Google OAuth flow."""
+
+    status: str
+    google_url: str
+    state: str
+
+
+class GoogleInteractiveStatusResponse(BaseModel):
+    """Status check for the active interactive Google OAuth authorization."""
+
+    status: str  # idle, starting, waiting, completed, failed
+    connected: bool = False
+    error: str | None = None
+
+
+class GoogleCallbackSubmitRequest(BaseModel):
+    """Request to manually forward an OAuth callback URL or code if remote."""
+
+    code_or_url: str = Field(
+        description="Either the authorization code or the full redirected URL (e.g. http://127.0.0.1:53682/?state=...&code=...)"
+    )
+    state: str | None = Field(default=None, description="State token if separated")
+
+
+class ICloudConnectRequest(BaseModel):
+    """Request payload to connect iCloud Drive."""
+
+    mode: str = Field(
+        default="apple_id",
+        description="Connection mode: 'apple_id' (WebDAV/iCloud API) or 'local' (host folder mount)",
+    )
+    apple_id: str | None = Field(default=None, description="Apple ID email address")
+    password: str | None = Field(
+        default=None, description="Apple App-Specific Password"
+    )
+    local_path: str | None = Field(
+        default=None, description="Local path on host/container to mount"
+    )
+
+
+class ConfigImportRequest(BaseModel):
+    """Request payload to import a complete rclone.conf file."""
+
+    content: str = Field(description="Raw text content of rclone.conf")

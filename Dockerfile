@@ -57,8 +57,8 @@ COPY entrypoint.sh ./entrypoint.sh
 RUN mkdir -p /app/config /app/data && \
     chmod +x /app/entrypoint.sh
 
-# Expose Web UI and FastAPI port
-EXPOSE 8000
+# Expose Web UI (8000) and Rclone OAuth redirect receiver (53682)
+EXPOSE 8000 53682
 
 # Container healthcheck
 HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=3 \

@@ -8,6 +8,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -31,15 +32,20 @@ from backend.demo import generate_demo_rclone_conf, setup_demo_environment
 from backend.history import HistoryEntry, HistoryItem, history_manager
 from backend.models import (
     BandwidthLimitRequest,
+    ConfigImportRequest,
     DisconnectRemoteRequest,
     FSItem,
     FSListRequest,
     FSListResponse,
     GoogleAuthResponse,
+    GoogleCallbackSubmitRequest,
+    GoogleInteractiveStartResponse,
+    GoogleInteractiveStatusResponse,
     GoogleOAuthExchangeRequest,
     GoogleOAuthTokenAuthRequest,
     GoogleServiceAccountAuthRequest,
     HealthResponse,
+    ICloudConnectRequest,
     JobInfo,
     JobStatusResponse,
     MkdirRequest,
@@ -67,6 +73,172 @@ logger = logging.getLogger("cloudsync.main")
 # In-memory job registry for user tracking
 # job_id -> JobInfo
 JOB_REGISTRY: dict[int, JobInfo] = {}
+
+
+class GoogleInteractiveAuth:
+    """Manages 1-click interactive Google OAuth flow via rclone authorize."""
+
+    def __init__(self):
+        self.proc: asyncio.subprocess.Process | None = None
+        self.state: str | None = None
+        self.google_url: str | None = None
+        self.status: str = "idle"  # idle, starting, waiting, completed, failed
+        self.error: str | None = None
+        self.token: dict[str, Any] | None = None
+        self._task: asyncio.Task | None = None
+
+    async def start(self) -> dict[str, Any]:
+        """Launch rclone authorize drive in the background and capture Google consent URL."""
+        await self.cancel()
+        self.status = "starting"
+        self.error = None
+        self.token = None
+        self.state = None
+        self.google_url = None
+
+        try:
+            self.proc = await asyncio.create_subprocess_exec(
+                "rclone",
+                "authorize",
+                "drive",
+                "--auth-no-open-browser",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+        except Exception as exc:
+            self.status = "failed"
+            self.error = f"Impossibile avviare il processo di autorizzazione: {exc}"
+            raise HTTPException(status_code=500, detail=self.error) from exc
+
+        found_url = None
+
+        async def read_stderr():
+            nonlocal found_url
+            while self.proc and self.proc.returncode is None:
+                line = await self.proc.stderr.readline()
+                if not line:
+                    break
+                text = line.decode()
+                logger.debug("rclone authorize output: %s", text.strip())
+                if "http://127.0.0.1:53682" in text:
+                    m = re.search(
+                        r"http://127\.0\.0\.1:53682/auth\?state=([a-zA-Z0-9_-]+)", text
+                    )
+                    if m:
+                        found_url = m.group(0)
+                        self.state = m.group(1)
+                        break
+
+        try:
+            await asyncio.wait_for(read_stderr(), timeout=6.0)
+        except TimeoutError:
+            await self.cancel()
+            self.status = "failed"
+            self.error = "Timeout durante l'avvio del server di autenticazione Rclone."
+            raise HTTPException(status_code=500, detail=self.error) from None
+
+        if not found_url:
+            await self.cancel()
+            self.status = "failed"
+            self.error = "Impossibile ricavare il link di login da Rclone."
+            raise HTTPException(status_code=500, detail=self.error)
+
+        # Query local server to get Google redirect URL
+        try:
+            async with httpx.AsyncClient(timeout=3.0) as client:
+                res = await client.get(found_url, follow_redirects=False)
+                self.google_url = res.headers.get("location") or found_url
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Could not fetch redirect location: %s", exc)
+            self.google_url = found_url
+
+        self.status = "waiting"
+
+        # Background listener for completed token on stdout
+        self._task = asyncio.create_task(self._wait_for_token())
+
+        return {
+            "status": "waiting",
+            "google_url": self.google_url,
+            "state": self.state or "",
+        }
+
+    async def _wait_for_token(self):
+        if not self.proc:
+            return
+        try:
+            stdout, stderr = await self.proc.communicate()
+            if self.proc.returncode == 0:
+                raw_token = stdout.decode().strip()
+                m = re.search(r"(\{.*\})", raw_token, re.DOTALL)
+                if m:
+                    token_json = json.loads(m.group(1))
+                    self.token = token_json
+                    await rclone_client.config_create(
+                        name="gdrive",
+                        remote_type="drive",
+                        parameters={"scope": "drive", "token": json.dumps(token_json)},
+                    )
+                    self.status = "completed"
+                    logger.info(
+                        "Google Drive collegato con successo via login interattivo!"
+                    )
+                else:
+                    self.status = "failed"
+                    self.error = "Formato token non riconosciuto."
+            else:
+                self.status = "failed"
+                self.error = stderr.decode().strip() or "Autorizzazione interrotta."
+        except Exception as exc:  # noqa: BLE001
+            self.status = "failed"
+            self.error = str(exc)
+
+    async def forward_callback(
+        self, code_or_url: str, state: str | None = None
+    ) -> bool:
+        """Forward callback code or full redirected URL to internal listener."""
+        input_str = code_or_url.strip()
+        code = input_str
+        st = state or self.state or ""
+
+        # Extract code & state if full URL was pasted
+        if "code=" in input_str:
+            code_match = re.search(r"[?&]code=([^&]+)", input_str)
+            if code_match:
+                code = code_match.group(1)
+        if "state=" in input_str:
+            state_match = re.search(r"[?&]state=([^&]+)", input_str)
+            if state_match:
+                st = state_match.group(1)
+
+        url = f"http://127.0.0.1:53682/?state={st}&code={code}"
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                resp = await client.get(url)
+                return resp.status_code == 200
+        except Exception as exc:  # noqa: BLE001
+            logger.error("Errore nell'inoltro del callback a Rclone: %s", exc)
+            return False
+
+    async def cancel(self):
+        """Clean up process and state."""
+        if self._task and not self._task.done():
+            self._task.cancel()
+        if self.proc and self.proc.returncode is None:
+            try:
+                self.proc.terminate()
+                await asyncio.wait_for(self.proc.wait(), timeout=1.0)
+            except Exception:  # noqa: BLE001
+                try:
+                    self.proc.kill()
+                except Exception as exc:  # noqa: BLE001
+                    logger.debug("Could not kill proc: %s", exc)
+        self.proc = None
+        self._task = None
+        self.status = "idle"
+
+
+google_auth_manager = GoogleInteractiveAuth()
 
 
 @asynccontextmanager
@@ -653,7 +825,171 @@ async def disconnect_remote(req: DisconnectRemoteRequest):
 
 
 # ---------------------------------------------------------------------------
-# Alternative Google Drive Authentication Methods
+# Streamlined 1-Click Google OAuth & Account Connect Endpoints
+# ---------------------------------------------------------------------------
+
+
+@app.post(
+    "/api/auth/google/interactive/start", response_model=GoogleInteractiveStartResponse
+)
+async def start_interactive_google_auth():
+    """Start 1-click interactive Google OAuth flow via Rclone background authorizer."""
+    data = await google_auth_manager.start()
+    return GoogleInteractiveStartResponse(
+        status=data["status"],
+        google_url=data["google_url"],
+        state=data["state"],
+    )
+
+
+@app.get(
+    "/api/auth/google/interactive/status",
+    response_model=GoogleInteractiveStatusResponse,
+)
+async def get_interactive_google_auth_status():
+    """Poll status of the active interactive Google OAuth login."""
+    is_connected = google_auth_manager.status == "completed"
+    return GoogleInteractiveStatusResponse(
+        status=google_auth_manager.status,
+        connected=is_connected,
+        error=google_auth_manager.error,
+    )
+
+
+@app.post("/api/auth/google/interactive/callback")
+async def submit_interactive_callback(req: GoogleCallbackSubmitRequest):
+    """Manually forward redirected URL or code from mobile/remote client."""
+    success = await google_auth_manager.forward_callback(req.code_or_url, req.state)
+    if not success:
+        raise HTTPException(
+            status_code=400,
+            detail="Impossibile inoltrare il codice al server di autenticazione locale.",
+        )
+    return {"status": "success", "message": "Codice inoltrato con successo."}
+
+
+@app.post("/api/auth/google/interactive/cancel")
+async def cancel_interactive_google_auth():
+    """Cancel active interactive Google OAuth login session."""
+    await google_auth_manager.cancel()
+    return {"status": "success", "message": "Sessione interrotta."}
+
+
+# ---------------------------------------------------------------------------
+# Streamlined iCloud Drive Connect Endpoint (Apple ID or Local Folder)
+# ---------------------------------------------------------------------------
+
+
+@app.post("/api/auth/icloud/connect")
+async def connect_icloud(req: ICloudConnectRequest):
+    """Configure and connect iCloud Drive via Apple ID or local host path."""
+    if req.mode == "local":
+        if not req.local_path or not req.local_path.strip():
+            raise HTTPException(
+                status_code=400,
+                detail="Specificare il percorso della cartella locale di iCloud.",
+            )
+        clean_path = req.local_path.strip()
+        await rclone_client.config_create(
+            name="icloud",
+            remote_type="alias",
+            parameters={"remote": clean_path},
+        )
+        return {
+            "status": "success",
+            "message": f"iCloud Drive collegato alla cartella locale '{clean_path}'.",
+            "connected": True,
+        }
+
+    # Mode: Apple ID
+    if not req.apple_id or not req.password:
+        raise HTTPException(
+            status_code=400,
+            detail="Apple ID (email) e Password specifica per app sono obbligatori.",
+        )
+
+    # Obscure password
+    proc = await asyncio.create_subprocess_exec(
+        "rclone",
+        "obscure",
+        req.password.strip(),
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    stdout, _ = await proc.communicate()
+    if proc.returncode != 0:
+        raise HTTPException(
+            status_code=500, detail="Errore nell'oscuramento della password Apple."
+        )
+    obscured_pass = stdout.decode().strip()
+
+    # Configure WebDAV remote for iCloud
+    await rclone_client.config_create(
+        name="icloud",
+        remote_type="webdav",
+        parameters={
+            "url": "https://p58-content.icloud.com",
+            "vendor": "other",
+            "user": req.apple_id.strip(),
+            "pass": obscured_pass,
+        },
+    )
+
+    # Verify connectivity
+    about = await rclone_client.get_about("icloud")
+    if "error" in about:
+        logger.warning("iCloud connection test warning: %s", about["error"])
+        return {
+            "status": "warning",
+            "message": f"Configurazione salvata, ma la verifica ha restituito: {about['error']}. Assicurati di aver generato una password specifica per app su appleid.apple.com.",
+            "connected": False,
+        }
+
+    return {
+        "status": "success",
+        "message": "iCloud Drive collegato e verificato con successo!",
+        "connected": True,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Direct rclone.conf Import / Export
+# ---------------------------------------------------------------------------
+
+
+@app.post("/api/config/import")
+async def import_config(req: ConfigImportRequest):
+    """Import an entire rclone.conf content."""
+    content = req.content.strip()
+    if not content:
+        raise HTTPException(
+            status_code=400, detail="Il contenuto di rclone.conf è vuoto."
+        )
+
+    p = Path(settings.rclone_config_path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(content, encoding="utf-8")
+
+    remotes = await rclone_client.list_remotes()
+    clean_remotes = [r.rstrip(":") for r in remotes]
+    return {
+        "status": "success",
+        "message": f"Configurazione rclone.conf importata con successo! Remoti rilevati: {', '.join(clean_remotes) if clean_remotes else 'Nessuno'}",
+        "remotes": clean_remotes,
+    }
+
+
+@app.get("/api/config/export")
+async def export_config():
+    """Export current rclone.conf content."""
+    p = Path(settings.rclone_config_path)
+    if not p.exists():
+        return {"content": ""}
+    return {"content": p.read_text(encoding="utf-8")}
+
+
+# ---------------------------------------------------------------------------
+# Alternative Google Drive Authentication Methods (SA, Token, Code)
 # ---------------------------------------------------------------------------
 
 

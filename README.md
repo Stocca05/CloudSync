@@ -103,35 +103,38 @@ Nella barra strumenti dell'applicazione puoi scegliere in ogni momento la modali
 
 ## 🔑 Accesso e Connessione con Account Google
 
-Non ci sono file inventati o mock all'avvio: l'applicazione all'apertura mostra chiaramente lo stato di connessione e invita ad accedere con il proprio account Google.
+Non ci sono file inventati o mock all'avvio: l'applicazione all'apertura mostra chiaramente lo stato di connessione e invita ad accedere con il proprio account.
 
-Cliccando sul pulsante **"Accedi con Google"** (nella colonna sorgente o nella barra di navigazione) puoi scegliere tra diversi metodi di connessione:
+### 🌟 Metodo 1: Accesso Ufficiale Google in 1-Click (Consigliato)
+- **Zero configurazioni tecniche:** Nessun bisogno di creare progetti su Google Cloud, Client ID o Service Account.
+- **Come funziona:**
+  1. Clicca sul pulsante **"Accedi con Google"** direttamente nella colonna o nella finestra di configurazione.
+  2. Si apre automaticamente la pagina ufficiale sicura di Google (`accounts.google.com`).
+  3. Clicca su **"Consenti"**: il token viene catturato in sicurezza dal server locale e Google Drive è immediatamente collegato e pronto all'uso!
+  4. *(Opzionale per smartphone/dispositivi remoti)*: Se la pagina di callback locale non è raggiungibile dal tuo telefono, puoi incollare l'URL o il codice reindirizzato nel box dedicato.
 
-### Metodo 1: Service Account Google Cloud (JSON) — *Consigliato*
-- **Perché è ideale:** Non richiede server web locali, non soffre di problemi di redirect del browser su porte locali, e **non scade mai**.
-- **Come si usa:**
-  1. Crea una Service Account gratuita su Google Cloud Console e scarica la chiave `.json`.
-  2. Condividi la cartella di Google Drive desiderata con l'indirizzo email della Service Account (es. `bot@tuo-progetto.iam.gserviceaccount.com`).
-  3. Nella Web UI di CloudSync, clicca **"Carica file .json"** (oppure incolla il testo JSON) e premi **"Connetti con Service Account"**.
-
-### Metodo 2: Codice di Autorizzazione Google OAuth
-- **Come si usa:**
-  1. Inserisci il tuo Client ID (e opzionalmente Client Secret).
-  2. Clicca su **"1. Apri Pagina Google"**: verrai indirizzato alla schermata ufficiale di consenso Google Drive.
-  3. Autorizza l'applicazione e copia il codice di autorizzazione generato.
-  4. Incolla il codice nel campo e premi **"3. Scambia Codice e Accedi"**. Il backend contatta Google, scambia il codice con i token e registra Google Drive in Rclone.
-
-### Metodo 3: Token OAuth JSON Diretto
-- Se disponi già di un token OAuth (generato tramite `rclone authorize "drive"` o sessioni precedenti), puoi incollare il blocco JSON (`{"access_token":"...","refresh_token":"..."}`) nel tab *Token Diretto*.
+### Metodo 2: Opzioni Avanzate (Service Account o Token OAuth JSON)
+- **Service Account Google Cloud:** Carica o incolla il file `.json` della tua Service Account Google Cloud se desideri un accesso persistente e illimitato legato a un progetto specifico.
+- **Token OAuth JSON Diretto:** Incolla una stringa di token pre-generata (`{"access_token": "...", ...}`).
 
 ---
 
 ## ☁️ Configurazione iCloud Drive (Destinazione)
 
-1. Vai su [appleid.apple.com](https://appleid.apple.com/account/manage) e genera una **Password specifica per le app** (es. "cloudsync").
-2. Nell'interfaccia di CloudSync, clicca sul pulsante **"Configura iCloud Drive"**.
-3. Inserisci la tua email Apple ID e la password specifica per app appena generata.
-4. Clicca su **"Salva iCloud"**: la password verrà automaticamente oscurata e protetta da Rclone.
+Per collegare iCloud Drive hai due opzioni immediate:
+
+1. **Account Apple (Cloud):**
+   - Vai su [appleid.apple.com](https://appleid.apple.com/account/manage) e genera una **Password specifica per le app** (es. con etichetta "cloudsync").
+   - Inserisci la tua email Apple ID e la password generata.
+   - La password viene oscurata e protetta da Rclone, testando immediatamente la connessione.
+2. **Cartella Locale Sincronizzata (Zero Rete):**
+   - Se utilizzi un Mac o un PC con l'app desktop di iCloud già installata, puoi collegare direttamente il percorso della cartella locale di iCloud (es. `~/Library/Mobile Documents/com~apple~CloudDocs`), senza passare per la rete!
+
+---
+
+## 📁 Importazione Diretta `rclone.conf`
+
+Se possiedi già una configurazione Rclone sul tuo computer, puoi caricare o incollare il file `rclone.conf` nel tab **"Importa rclone.conf"** del pannello *Gestione Account*: CloudSync caricherà tutti i tuoi remoti configurati all'istante.
 
 ---
 

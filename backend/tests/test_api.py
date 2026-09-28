@@ -323,3 +323,97 @@ async def test_disconnect_remote(monkeypatch):
         res = await ac.post("/api/remotes/disconnect", json={"remote": "gdrive"})
         assert res.status_code == 200
         assert deleted_remote == "gdrive"
+
+
+@pytest.mark.asyncio
+async def test_google_interactive_auth_status_and_cancel():
+    """Test interactive Google auth status polling and session cancellation."""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        status_res = await ac.get("/api/auth/google/interactive/status")
+        assert status_res.status_code == 200
+        status_data = status_res.json()
+        assert "status" in status_data
+        assert "connected" in status_data
+
+        cancel_res = await ac.post("/api/auth/google/interactive/cancel")
+        assert cancel_res.status_code == 200
+        cancel_data = cancel_res.json()
+        assert cancel_data["status"] == "success"
+
+
+@pytest.mark.asyncio
+async def test_icloud_connect_local(monkeypatch):
+    """Test iCloud connect with a local directory path."""
+    created = {}
+
+    async def mock_config_create(name, remote_type, parameters, obscure=False):
+        nonlocal created
+        created = {"name": name, "type": remote_type, "params": parameters}
+        return {"status": "ok"}
+
+    monkeypatch.setattr(rclone_client, "config_create", mock_config_create)
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        res = await ac.post(
+            "/api/auth/icloud/connect",
+            json={"mode": "local", "local_path": "/root/CloudSync/data/icloud"},
+        )
+        assert res.status_code == 200
+        data = res.json()
+        assert data["connected"] is True
+        assert created["name"] == "icloud"
+        assert created["type"] == "alias"
+        assert created["params"]["remote"] == "/root/CloudSync/data/icloud"
+
+
+@pytest.mark.asyncio
+async def test_icloud_connect_validation_error():
+    """Test iCloud connect returns 400 when required fields are missing."""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        # Local mode without local_path
+        res_local = await ac.post(
+            "/api/auth/icloud/connect",
+            json={"mode": "local", "local_path": ""},
+        )
+        assert res_local.status_code == 400
+
+        # Apple ID mode without password
+        res_cloud = await ac.post(
+            "/api/auth/icloud/connect",
+            json={"mode": "apple_id", "apple_id": "test@icloud.com", "password": ""},
+        )
+        assert res_cloud.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_config_import_and_export(tmp_path, monkeypatch):
+    """Test importing and exporting rclone.conf."""
+    from backend.config import settings
+
+    test_conf = tmp_path / "rclone.conf"
+    monkeypatch.setattr(settings, "rclone_config_path", str(test_conf))
+
+    async def mock_list_remotes():
+        return ["gdrive", "icloud"]
+
+    monkeypatch.setattr(rclone_client, "list_remotes", mock_list_remotes)
+
+    sample_conf = "[gdrive]\ntype = drive\n\n[icloud]\ntype = webdav\n"
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        import_res = await ac.post(
+            "/api/config/import",
+            json={"content": sample_conf},
+        )
+        assert import_res.status_code == 200
+        import_data = import_res.json()
+        assert import_data["status"] == "success"
+        assert "gdrive" in import_data["remotes"]
+
+        export_res = await ac.get("/api/config/export")
+        assert export_res.status_code == 200
+        assert export_res.json()["content"] == sample_conf.strip()

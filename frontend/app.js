@@ -128,13 +128,19 @@ async function checkRemotesStatus() {
     const btnNewFolderIcloud = document.getElementById("btn-new-folder-icloud");
     const btnDiscIcloud = document.getElementById("btn-disconnect-icloud");
 
-    state.remotes.gdrive = Boolean(data.gdrive_configured && data.gdrive?.connected);
-    state.remotes.icloud = Boolean(data.icloud_configured && data.icloud?.connected);
+    state.remotes.gdrive = Boolean(
+      data.gdrive_configured && data.gdrive?.connected,
+    );
+    state.remotes.icloud = Boolean(
+      data.icloud_configured && data.icloud?.connected,
+    );
 
     // Update GDrive status pill & column view
     if (state.remotes.gdrive) {
       dotGdrive.className = "w-2 h-2 rounded-full bg-emerald-400";
-      const used = data.gdrive?.used_bytes ? formatBytes(data.gdrive.used_bytes) : "Connesso";
+      const used = data.gdrive?.used_bytes
+        ? formatBytes(data.gdrive.used_bytes)
+        : "Connesso";
       infoGdrive.textContent = used;
       infoGdrive.className = "text-emerald-400 font-medium text-[11px]";
 
@@ -162,7 +168,9 @@ async function checkRemotesStatus() {
     // Update iCloud status pill & column view
     if (state.remotes.icloud) {
       dotIcloud.className = "w-2 h-2 rounded-full bg-emerald-400";
-      const info = data.icloud?.used_bytes ? formatBytes(data.icloud.used_bytes) : "Connesso";
+      const info = data.icloud?.used_bytes
+        ? formatBytes(data.icloud.used_bytes)
+        : "Connesso";
       infoIcloud.textContent = info;
       infoIcloud.className = "text-emerald-400 font-medium text-[11px]";
 
@@ -185,9 +193,14 @@ async function checkRemotesStatus() {
       state.icloudItems = [];
     }
 
-    logMessage(`Stato account: Google Drive=${state.remotes.gdrive ? "Connesso" : "Disconnesso"}, iCloud=${state.remotes.icloud ? "Connesso" : "Non configurato"}`);
+    logMessage(
+      `Stato account: Google Drive=${state.remotes.gdrive ? "Connesso" : "Disconnesso"}, iCloud=${state.remotes.icloud ? "Connesso" : "Non configurato"}`,
+    );
   } catch (err) {
-    logMessage("Impossibile verificare lo stato dei remoti: " + err.message, "error");
+    logMessage(
+      "Impossibile verificare lo stato dei remoti: " + err.message,
+      "error",
+    );
   }
 }
 
@@ -200,30 +213,56 @@ function setTransferMode(isMove) {
 
   const btnMove = document.getElementById("btn-mode-move");
   const btnCopy = document.getElementById("btn-mode-copy");
-  const containerDeleteEmpty = document.getElementById("container-delete-empty");
+  const containerDeleteEmpty = document.getElementById(
+    "container-delete-empty",
+  );
   const btnTrigger = document.getElementById("btn-trigger-move");
   const btnTriggerText = document.getElementById("btn-trigger-text");
 
   if (isMove) {
     // Mode MOVE
-    btnMove.className = "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30 transition shadow-sm";
-    btnCopy.className = "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-slate-200 transition";
+    btnMove.className =
+      "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30 transition shadow-sm";
+    btnCopy.className =
+      "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-slate-200 transition";
 
     containerDeleteEmpty.classList.remove("hidden");
     btnTriggerText.textContent = "Sposta su iCloud Drive (Elimina da Google)";
-    btnTrigger.classList.remove("bg-blue-600", "hover:bg-blue-500", "shadow-blue-900/30");
-    btnTrigger.classList.add("bg-amber-600", "hover:bg-amber-500", "shadow-amber-900/30");
-    logMessage("Modalità impostata: SPOSTAMENTO (i file sorgente verranno cancellati dopo il completamento)");
+    btnTrigger.classList.remove(
+      "bg-blue-600",
+      "hover:bg-blue-500",
+      "shadow-blue-900/30",
+    );
+    btnTrigger.classList.add(
+      "bg-amber-600",
+      "hover:bg-amber-500",
+      "shadow-amber-900/30",
+    );
+    logMessage(
+      "Modalità impostata: SPOSTAMENTO (i file sorgente verranno cancellati dopo il completamento)",
+    );
   } else {
     // Mode COPY
-    btnMove.className = "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-slate-200 transition";
-    btnCopy.className = "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-500/20 text-blue-300 border border-blue-500/30 transition shadow-sm";
+    btnMove.className =
+      "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-slate-200 transition";
+    btnCopy.className =
+      "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-500/20 text-blue-300 border border-blue-500/30 transition shadow-sm";
 
     containerDeleteEmpty.classList.add("hidden");
     btnTriggerText.textContent = "Copia su iCloud Drive (Mantieni su Google)";
-    btnTrigger.classList.remove("bg-amber-600", "hover:bg-amber-500", "shadow-amber-900/30");
-    btnTrigger.classList.add("bg-blue-600", "hover:bg-blue-500", "shadow-blue-900/30");
-    logMessage("Modalità impostata: COPIA (i file sorgente verranno CONSERVATI intatti)");
+    btnTrigger.classList.remove(
+      "bg-amber-600",
+      "hover:bg-amber-500",
+      "shadow-amber-900/30",
+    );
+    btnTrigger.classList.add(
+      "bg-blue-600",
+      "hover:bg-blue-500",
+      "shadow-blue-900/30",
+    );
+    logMessage(
+      "Modalità impostata: COPIA (i file sorgente verranno CONSERVATI intatti)",
+    );
   }
 }
 
@@ -250,14 +289,19 @@ async function loadGDrive(path = "") {
 
     if (!res.ok) {
       const err = await res.json();
-      throw new Error(err.details || err.error || "Errore nella lettura dei file");
+      throw new Error(
+        err.details || err.error || "Errore nella lettura dei file",
+      );
     }
 
     const data = await res.json();
     state.gdriveItems = data.items || [];
     renderGDriveTable();
   } catch (err) {
-    logMessage(`Errore caricamento Google Drive [${path}]: ${err.message}`, "error");
+    logMessage(
+      `Errore caricamento Google Drive [${path}]: ${err.message}`,
+      "error",
+    );
     tbody.innerHTML = `<tr><td colspan="3" class="p-6 text-center text-rose-400 text-xs">Errore nel caricamento: ${err.message}</td></tr>`;
   } finally {
     loading.classList.add("hidden");
@@ -267,10 +311,14 @@ async function loadGDrive(path = "") {
 function renderGDriveTable() {
   const tbody = document.getElementById("file-list-gdrive");
   const empty = document.getElementById("empty-gdrive");
-  const searchTerm = (document.getElementById("search-gdrive").value || "").toLowerCase();
+  const searchTerm = (
+    document.getElementById("search-gdrive").value || ""
+  ).toLowerCase();
 
   tbody.innerHTML = "";
-  const filtered = state.gdriveItems.filter((i) => i.name.toLowerCase().includes(searchTerm));
+  const filtered = state.gdriveItems.filter((i) =>
+    i.name.toLowerCase().includes(searchTerm),
+  );
 
   if (filtered.length === 0) {
     empty.classList.remove("hidden");
@@ -349,14 +397,19 @@ async function loadICloud(path = "") {
 
     if (!res.ok) {
       const err = await res.json();
-      throw new Error(err.details || err.error || "Errore nella lettura dei file");
+      throw new Error(
+        err.details || err.error || "Errore nella lettura dei file",
+      );
     }
 
     const data = await res.json();
     state.icloudItems = data.items || [];
     renderICloudTable();
   } catch (err) {
-    logMessage(`Errore caricamento iCloud Drive [${path}]: ${err.message}`, "error");
+    logMessage(
+      `Errore caricamento iCloud Drive [${path}]: ${err.message}`,
+      "error",
+    );
     tbody.innerHTML = `<tr><td colspan="2" class="p-6 text-center text-rose-400 text-xs">Errore nel caricamento: ${err.message}</td></tr>`;
   } finally {
     loading.classList.add("hidden");
@@ -376,7 +429,8 @@ function renderICloudTable() {
 
   state.icloudItems.forEach((item) => {
     const tr = document.createElement("tr");
-    tr.className = "hover:bg-slate-800/40 transition cursor-pointer select-none";
+    tr.className =
+      "hover:bg-slate-800/40 transition cursor-pointer select-none";
 
     tr.innerHTML = `
       <td class="py-2 px-3 flex items-center gap-2 truncate">
@@ -406,7 +460,8 @@ function renderBreadcrumbs(remote, path) {
   container.innerHTML = "";
 
   const rootSpan = document.createElement("span");
-  rootSpan.className = "hover:text-white cursor-pointer px-1 py-0.5 rounded hover:bg-slate-800 transition font-bold text-slate-300";
+  rootSpan.className =
+    "hover:text-white cursor-pointer px-1 py-0.5 rounded hover:bg-slate-800 transition font-bold text-slate-300";
   rootSpan.textContent = remote === "gdrive" ? "gdrive:/" : "icloud:/";
   rootSpan.addEventListener("click", () => {
     if (remote === "gdrive") loadGDrive("");
@@ -429,7 +484,10 @@ function renderBreadcrumbs(remote, path) {
     const targetPath = currentPath;
 
     const span = document.createElement("span");
-    span.className = index === parts.length - 1 ? "text-slate-100 font-semibold px-1" : "hover:text-white cursor-pointer px-1 py-0.5 rounded hover:bg-slate-800 transition";
+    span.className =
+      index === parts.length - 1
+        ? "text-slate-100 font-semibold px-1"
+        : "hover:text-white cursor-pointer px-1 py-0.5 rounded hover:bg-slate-800 transition";
     span.textContent = p;
     if (index !== parts.length - 1) {
       span.addEventListener("click", () => {
@@ -471,18 +529,22 @@ function updateSelectionUI() {
   btnTrigger.disabled = count === 0;
 
   // Sync individual checkboxes in view
-  document.querySelectorAll("#file-list-gdrive .item-checkbox").forEach((chk) => {
-    const path = chk.getAttribute("data-path");
-    chk.checked = state.selectedItems.has(path);
-    const row = chk.closest("tr");
-    if (row) {
-      if (chk.checked) row.classList.add("bg-blue-950/30");
-      else row.classList.remove("bg-blue-950/30");
-    }
-  });
+  document
+    .querySelectorAll("#file-list-gdrive .item-checkbox")
+    .forEach((chk) => {
+      const path = chk.getAttribute("data-path");
+      chk.checked = state.selectedItems.has(path);
+      const row = chk.closest("tr");
+      if (row) {
+        if (chk.checked) row.classList.add("bg-blue-950/30");
+        else row.classList.remove("bg-blue-950/30");
+      }
+    });
 
   // Sync master checkbox
-  const visibleCheckboxes = document.querySelectorAll("#file-list-gdrive .item-checkbox");
+  const visibleCheckboxes = document.querySelectorAll(
+    "#file-list-gdrive .item-checkbox",
+  );
   if (visibleCheckboxes.length > 0) {
     const allChecked = Array.from(visibleCheckboxes).every((c) => c.checked);
     masterCheckbox.checked = allChecked;
@@ -502,7 +564,8 @@ function openConfirmationModal() {
   const isMove = state.deleteSource;
 
   document.getElementById("modal-items-count").textContent = count;
-  document.getElementById("modal-target-path").textContent = `icloud:/${state.icloudPath}`;
+  document.getElementById("modal-target-path").textContent =
+    `icloud:/${state.icloudPath}`;
 
   const isDryRun = document.getElementById("toggle-dry-run").checked;
   const dryWarning = document.getElementById("modal-dry-run-warning");
@@ -520,15 +583,20 @@ function openConfirmationModal() {
     subtitleEl.textContent = "Operazione atomica di spostamento (Move)";
     noticeEl.innerHTML = `ℹ️ I file sorgente su Google Drive verranno rimossi <strong>esclusivamente dopo</strong> il completamento e la verifica di integrità su iCloud Drive.`;
     btnProceed.textContent = "Conferma e Sposta (Elimina sorgente)";
-    btnProceed.className = "px-5 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold transition shadow-lg shadow-amber-900/30";
-    iconBox.className = "w-10 h-10 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center shrink-0";
+    btnProceed.className =
+      "px-5 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold transition shadow-lg shadow-amber-900/30";
+    iconBox.className =
+      "w-10 h-10 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center shrink-0";
   } else {
     titleEl.textContent = "Conferma Copia File";
-    subtitleEl.textContent = "Operazione di duplicazione (Copy - Conserva sorgente)";
+    subtitleEl.textContent =
+      "Operazione di duplicazione (Copy - Conserva sorgente)";
     noticeEl.innerHTML = `ℹ️ I file originali su Google Drive <strong>non verranno toccati</strong> né eliminati. Verrà creata una copia esatta su iCloud Drive.`;
     btnProceed.textContent = "Conferma e Copia (Mantieni sorgente)";
-    btnProceed.className = "px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold transition shadow-lg shadow-blue-900/30";
-    iconBox.className = "w-10 h-10 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center shrink-0";
+    btnProceed.className =
+      "px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold transition shadow-lg shadow-blue-900/30";
+    iconBox.className =
+      "w-10 h-10 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center shrink-0";
   }
 
   document.getElementById("modal-confirm").classList.remove("hidden");
@@ -553,12 +621,15 @@ async function executeTransfer() {
     items: items,
     delete_source: state.deleteSource,
     export_docs: document.getElementById("toggle-export-docs").checked,
-    delete_empty_src_dirs: document.getElementById("toggle-delete-empty").checked,
+    delete_empty_src_dirs: document.getElementById("toggle-delete-empty")
+      .checked,
     dry_run: document.getElementById("toggle-dry-run").checked,
   };
 
   const actionVerb = state.deleteSource ? "spostamento" : "copia";
-  logMessage(`Avvio job di ${actionVerb} per ${items.length} elemento/i verso icloud:/${state.icloudPath}...`);
+  logMessage(
+    `Avvio job di ${actionVerb} per ${items.length} elemento/i verso icloud:/${state.icloudPath}...`,
+  );
 
   try {
     const res = await fetch("/api/transfer/move", {
@@ -569,7 +640,9 @@ async function executeTransfer() {
 
     if (!res.ok) {
       const err = await res.json();
-      throw new Error(err.detail || err.error || "Errore durante l'avvio del trasferimento");
+      throw new Error(
+        err.detail || err.error || "Errore durante l'avvio del trasferimento",
+      );
     }
 
     const data = await res.json();
@@ -656,19 +729,30 @@ function fallbackToSSE() {
 
 function updateDashboardMetrics(stats) {
   // Speed
-  document.getElementById("metric-speed").textContent = formatSpeed(stats.speed);
+  document.getElementById("metric-speed").textContent = formatSpeed(
+    stats.speed,
+  );
 
   // Bytes
-  document.getElementById("metric-bytes").textContent = formatBytes(stats.bytes);
-  document.getElementById("metric-total-bytes").textContent = `/ ${formatBytes(stats.total_bytes)}`;
+  document.getElementById("metric-bytes").textContent = formatBytes(
+    stats.bytes,
+  );
+  document.getElementById("metric-total-bytes").textContent =
+    `/ ${formatBytes(stats.total_bytes)}`;
 
   // Transfers
-  document.getElementById("metric-transfers").textContent = stats.transfers || 0;
-  document.getElementById("metric-total-transfers").textContent = `/ ${stats.total_transfers || 0}`;
+  document.getElementById("metric-transfers").textContent =
+    stats.transfers || 0;
+  document.getElementById("metric-total-transfers").textContent =
+    `/ ${stats.total_transfers || 0}`;
 
   // Time & ETA
-  document.getElementById("metric-time").textContent = formatSeconds(stats.elapsed_time);
-  const etaText = stats.eta ? `(ETA: ${formatSeconds(stats.eta)})` : "(ETA: --)";
+  document.getElementById("metric-time").textContent = formatSeconds(
+    stats.elapsed_time,
+  );
+  const etaText = stats.eta
+    ? `(ETA: ${formatSeconds(stats.eta)})`
+    : "(ETA: --)";
   document.getElementById("metric-eta").textContent = etaText;
 
   // Active jobs badge
@@ -678,11 +762,18 @@ function updateDashboardMetrics(stats) {
   // Global Progress bar
   let percent = 0;
   if (stats.total_bytes > 0) {
-    percent = Math.min(100, Math.round((stats.bytes / stats.total_bytes) * 100));
+    percent = Math.min(
+      100,
+      Math.round((stats.bytes / stats.total_bytes) * 100),
+    );
   } else if (stats.total_transfers > 0) {
-    percent = Math.min(100, Math.round((stats.transfers / stats.total_transfers) * 100));
+    percent = Math.min(
+      100,
+      Math.round((stats.transfers / stats.total_transfers) * 100),
+    );
   }
-  document.getElementById("global-progress-percent").textContent = `${percent}%`;
+  document.getElementById("global-progress-percent").textContent =
+    `${percent}%`;
   document.getElementById("global-progress-bar").style.width = `${percent}%`;
 
   // Transferring in-flight files list
@@ -721,190 +812,419 @@ function renderInFlightFiles(files) {
   });
 }
 
+// State for interactive Google OAuth
+let googleInteractivePollTimer = null;
+let googleAuthTargetUrl = null;
+
 // ---------------------------------------------------------------------------
-// Google Auth Modal (Alternative Methods: Service Account, OAuth Code, Token)
+// 1-Click Interactive Google OAuth
 // ---------------------------------------------------------------------------
 
-function openGoogleAuthModal(defaultTab = "sa") {
-  document.getElementById("modal-google-auth").classList.remove("hidden");
-  switchGoogleAuthTab(defaultTab);
-  const msg = document.getElementById("ga-status-msg");
-  msg.className = "hidden text-xs p-3 rounded-xl";
-}
+async function startGoogleInteractiveAuth() {
+  const modal = document.getElementById("modal-google-interactive");
+  const subtitle = document.getElementById("ga-interactive-subtitle");
+  modal.classList.remove("hidden");
+  subtitle.textContent =
+    "Inizializzazione sessione di autenticazione con Google...";
 
-function closeGoogleAuthModal() {
-  document.getElementById("modal-google-auth").classList.add("hidden");
-}
+  try {
+    const res = await fetch("/api/auth/google/interactive/start", {
+      method: "POST",
+    });
+    const data = await res.json();
 
-function switchGoogleAuthTab(tab) {
-  const btnSa = document.getElementById("tab-ga-sa");
-  const btnCode = document.getElementById("tab-ga-code");
-  const btnToken = document.getElementById("tab-ga-token");
+    if (!res.ok) {
+      throw new Error(data.detail || "Impossibile avviare il login Google.");
+    }
 
-  const contentSa = document.getElementById("content-ga-sa");
-  const contentCode = document.getElementById("content-ga-code");
-  const contentToken = document.getElementById("content-ga-token");
+    googleAuthTargetUrl = data.google_url;
+    subtitle.innerHTML =
+      'Abbiamo aperto la schermata ufficiale di login Google in una nuova scheda. Accedi e fai clic su <strong>"Consenti"</strong>.';
 
-  btnSa.className = "py-1.5 px-2 rounded-lg text-slate-400 hover:text-white transition text-center truncate";
-  btnCode.className = "py-1.5 px-2 rounded-lg text-slate-400 hover:text-white transition text-center truncate";
-  btnToken.className = "py-1.5 px-2 rounded-lg text-slate-400 hover:text-white transition text-center truncate";
+    // Open Google login page in new tab
+    if (googleAuthTargetUrl) {
+      window.open(googleAuthTargetUrl, "_blank");
+    }
 
-  contentSa.classList.add("hidden");
-  contentCode.classList.add("hidden");
-  contentToken.classList.add("hidden");
+    // Start polling status
+    if (googleInteractivePollTimer) clearInterval(googleInteractivePollTimer);
+    googleInteractivePollTimer = setInterval(pollGoogleInteractiveStatus, 1500);
 
-  if (tab === "sa") {
-    btnSa.className = "py-1.5 px-2 rounded-lg bg-blue-600 text-white font-semibold transition text-center truncate";
-    contentSa.classList.remove("hidden");
-  } else if (tab === "code") {
-    btnCode.className = "py-1.5 px-2 rounded-lg bg-blue-600 text-white font-semibold transition text-center truncate";
-    contentCode.classList.remove("hidden");
-  } else if (tab === "token") {
-    btnToken.className = "py-1.5 px-2 rounded-lg bg-blue-600 text-white font-semibold transition text-center truncate";
-    contentToken.classList.remove("hidden");
+    logMessage(
+      "Sessione di login Google avviata. In attesa di autorizzazione...",
+      "info",
+    );
+  } catch (err) {
+    subtitle.innerHTML = `<span class="text-rose-400 font-medium">Errore: ${err.message}</span>`;
+    logMessage(`Errore avvio login Google: ${err.message}`, "error");
   }
 }
 
-async function submitGoogleServiceAccount() {
-  const saJson = document.getElementById("input-ga-sa-json").value.trim();
-  const folderId = document.getElementById("input-ga-folder-id").value.trim();
-  const msg = document.getElementById("ga-status-msg");
+async function pollGoogleInteractiveStatus() {
+  try {
+    const res = await fetch("/api/auth/google/interactive/status");
+    if (!res.ok) return;
+    const data = await res.json();
 
-  if (!saJson) {
-    msg.className = "text-xs p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300";
-    msg.textContent = "Inserisci o carica il contenuto JSON della Service Account Google.";
+    if (data.status === "completed" || data.connected) {
+      clearInterval(googleInteractivePollTimer);
+      googleInteractivePollTimer = null;
+      closeGoogleInteractiveModal();
+      closeConfigModal();
+      logMessage("Google Drive connesso con successo!", "success");
+      await checkRemotesStatus();
+    } else if (data.status === "failed") {
+      clearInterval(googleInteractivePollTimer);
+      googleInteractivePollTimer = null;
+      const subtitle = document.getElementById("ga-interactive-subtitle");
+      subtitle.innerHTML = `<span class="text-rose-400 font-medium">Autorizzazione fallita: ${data.error || "Riprova"}</span>`;
+      logMessage(
+        `Autorizzazione Google fallita: ${data.error || "Errore sconosciuto"}`,
+        "error",
+      );
+    }
+  } catch (err) {
+    console.debug("Polling error:", err);
+  }
+}
+
+function reopenGoogleLoginTab() {
+  if (googleAuthTargetUrl) {
+    window.open(googleAuthTargetUrl, "_blank");
+  }
+}
+
+function toggleGoogleInteractiveFallback() {
+  const box = document.getElementById("ga-fallback-box");
+  box.classList.toggle("hidden");
+}
+
+async function submitGoogleInteractiveCallback() {
+  const input = document.getElementById("input-ga-remote-url");
+  const val = input.value.trim();
+  if (!val) return;
+
+  try {
+    const res = await fetch("/api/auth/google/interactive/callback", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code_or_url: val }),
+    });
+    const data = await res.json();
+    if (!res.ok)
+      throw new Error(data.detail || "Errore durante l'invio del codice");
+
+    logMessage(
+      "Codice di autorizzazione inviato a Rclone. Verifica in corso...",
+      "info",
+    );
+    input.value = "";
+    // Trigger immediate poll
+    await pollGoogleInteractiveStatus();
+  } catch (err) {
+    alert("Errore: " + err.message);
+  }
+}
+
+async function closeGoogleInteractiveModal() {
+  document.getElementById("modal-google-interactive").classList.add("hidden");
+  if (googleInteractivePollTimer) {
+    clearInterval(googleInteractivePollTimer);
+    googleInteractivePollTimer = null;
+    try {
+      await fetch("/api/auth/google/interactive/cancel", { method: "POST" });
+    } catch (_) {}
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Unified Account Manager Modal (Config Modal)
+// ---------------------------------------------------------------------------
+
+function openConfigModal(initialTab = "gdrive") {
+  document.getElementById("modal-config").classList.remove("hidden");
+  const msg = document.getElementById("config-status-msg");
+  if (msg) msg.classList.add("hidden");
+  switchConfigTab(initialTab);
+}
+
+function closeConfigModal() {
+  document.getElementById("modal-config").classList.add("hidden");
+}
+
+function switchConfigTab(tab) {
+  const btnGdrive = document.getElementById("tab-btn-gdrive");
+  const btnIcloud = document.getElementById("tab-btn-icloud");
+  const btnImport = document.getElementById("tab-btn-import");
+
+  const contentGdrive = document.getElementById("tab-content-gdrive");
+  const contentIcloud = document.getElementById("tab-content-icloud");
+  const contentImport = document.getElementById("tab-content-import");
+
+  // Inactive base styles
+  btnGdrive.className =
+    "py-2 px-2 rounded-lg text-slate-400 hover:text-white transition text-center truncate";
+  btnIcloud.className =
+    "py-2 px-2 rounded-lg text-slate-400 hover:text-white transition text-center truncate";
+  btnImport.className =
+    "py-2 px-2 rounded-lg text-slate-400 hover:text-white transition text-center truncate";
+
+  contentGdrive.classList.add("hidden");
+  contentIcloud.classList.add("hidden");
+  contentImport.classList.add("hidden");
+
+  if (tab === "gdrive") {
+    btnGdrive.className =
+      "py-2 px-2 rounded-lg bg-blue-600 text-white font-semibold transition text-center truncate";
+    contentGdrive.classList.remove("hidden");
+  } else if (tab === "icloud") {
+    btnIcloud.className =
+      "py-2 px-2 rounded-lg bg-cyan-600 text-white font-semibold transition text-center truncate";
+    contentIcloud.classList.remove("hidden");
+  } else if (tab === "import") {
+    btnImport.className =
+      "py-2 px-2 rounded-lg bg-emerald-600 text-white font-semibold transition text-center truncate";
+    contentImport.classList.remove("hidden");
+  }
+}
+
+function toggleGDriveAdvancedFields(forceOpen = null) {
+  const box = document.getElementById("gdrive-advanced-fields");
+  if (forceOpen === true) {
+    box.classList.remove("hidden");
+  } else if (forceOpen === false) {
+    box.classList.add("hidden");
+  } else {
+    box.classList.toggle("hidden");
+  }
+}
+
+async function saveGDriveAdvanced() {
+  const saJson = document.getElementById("cfg-gdrive-sa-json").value.trim();
+  const tokenJson = document.getElementById("cfg-gdrive-token").value.trim();
+  const statusMsg = document.getElementById("config-status-msg");
+
+  if (!saJson && !tokenJson) {
+    statusMsg.className =
+      "text-xs p-2.5 rounded-lg bg-rose-500/10 text-rose-300 border border-rose-500/20";
+    statusMsg.textContent =
+      "Inserisci un JSON Service Account o un Token OAuth valido.";
+    statusMsg.classList.remove("hidden");
     return;
   }
 
-  msg.className = "text-xs p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-300";
-  msg.textContent = "Configurazione e verifica Service Account in corso...";
+  statusMsg.className =
+    "text-xs p-2.5 rounded-lg bg-blue-500/10 text-blue-300 border border-blue-500/20";
+  statusMsg.textContent = "Configurazione remota Google Drive in corso...";
+  statusMsg.classList.remove("hidden");
 
   try {
-    const res = await fetch("/api/auth/google/service-account", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        service_account_json: saJson,
-        folder_id: folderId || null,
-      }),
-    });
+    let res, data;
+    if (saJson) {
+      res = await fetch("/api/auth/google/service-account", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ service_account_json: saJson }),
+      });
+    } else {
+      res = await fetch("/api/auth/google/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token_json: tokenJson }),
+      });
+    }
 
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.detail || "Errore configurazione Service Account");
+    data = await res.json();
+    if (!res.ok)
+      throw new Error(data.detail || "Errore nella configurazione avanzata");
 
-    msg.className = "text-xs p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300";
-    msg.textContent = data.message;
+    statusMsg.className =
+      "text-xs p-2.5 rounded-lg bg-emerald-500/10 text-emerald-300 border border-emerald-500/20";
+    statusMsg.textContent = "✓ " + data.message;
     logMessage(data.message, "success");
 
     setTimeout(() => {
-      closeGoogleAuthModal();
+      closeConfigModal();
       checkRemotesStatus();
     }, 1200);
   } catch (err) {
-    msg.className = "text-xs p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300";
-    msg.textContent = err.message;
-    logMessage(`Errore login Google Service Account: ${err.message}`, "error");
+    statusMsg.className =
+      "text-xs p-2.5 rounded-lg bg-rose-500/10 text-rose-300 border border-rose-500/20";
+    statusMsg.textContent = err.message;
+    logMessage(
+      `Errore configurazione avanzata Google: ${err.message}`,
+      "error",
+    );
   }
 }
 
-function openGoogleConsentWindow() {
-  const clientId = document.getElementById("input-ga-code-client-id").value.trim();
-  if (!clientId) {
-    alert("Inserisci prima il tuo Client ID Google per generare l'autorizzazione.");
-    return;
+// iCloud Subtabs & Connect
+function switchICloudSubtab(mode) {
+  const btnCloud = document.getElementById("btn-subtab-icloud-cloud");
+  const btnLocal = document.getElementById("btn-subtab-icloud-local");
+  const contentCloud = document.getElementById("subcontent-icloud-cloud");
+  const contentLocal = document.getElementById("subcontent-icloud-local");
+
+  if (mode === "cloud") {
+    btnCloud.className =
+      "flex-1 py-1.5 rounded-lg bg-cyan-600 text-white font-semibold text-center transition";
+    btnLocal.className =
+      "flex-1 py-1.5 rounded-lg text-slate-400 hover:text-white text-center transition";
+    contentCloud.classList.remove("hidden");
+    contentLocal.classList.add("hidden");
+  } else {
+    btnLocal.className =
+      "flex-1 py-1.5 rounded-lg bg-cyan-600 text-white font-semibold text-center transition";
+    btnCloud.className =
+      "flex-1 py-1.5 rounded-lg text-slate-400 hover:text-white text-center transition";
+    contentLocal.classList.remove("hidden");
+    contentCloud.classList.add("hidden");
   }
-  const scope = encodeURIComponent("https://www.googleapis.com/auth/drive");
-  const redirectUri = encodeURIComponent("urn:ietf:wg:oauth:2.0:oob");
-  const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(clientId)}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}&access_type=offline`;
-  window.open(url, "_blank");
 }
 
-async function submitGoogleAuthCode() {
-  const code = document.getElementById("input-ga-auth-code").value.trim();
-  const clientId = document.getElementById("input-ga-code-client-id").value.trim();
-  const clientSecret = document.getElementById("input-ga-code-client-secret").value.trim();
-  const msg = document.getElementById("ga-status-msg");
+async function saveICloudCloud() {
+  const user = document.getElementById("cfg-icloud-user").value.trim();
+  const pass = document.getElementById("cfg-icloud-pass").value.trim();
+  const statusMsg = document.getElementById("config-status-msg");
 
-  if (!code || !clientId) {
-    msg.className = "text-xs p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300";
-    msg.textContent = "Client ID e Codice di Autorizzazione sono obbligatori.";
+  if (!user || !pass) {
+    statusMsg.className =
+      "text-xs p-2.5 rounded-lg bg-rose-500/10 text-rose-300 border border-rose-500/20";
+    statusMsg.textContent =
+      "Apple ID e Password specifica per l'app sono obbligatori.";
+    statusMsg.classList.remove("hidden");
     return;
   }
 
-  msg.className = "text-xs p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-300";
-  msg.textContent = "Scambio codice con Google in corso...";
+  statusMsg.className =
+    "text-xs p-2.5 rounded-lg bg-cyan-500/10 text-cyan-300 border border-cyan-500/20";
+  statusMsg.textContent = "Connessione a iCloud Drive in corso...";
+  statusMsg.classList.remove("hidden");
 
   try {
-    const res = await fetch("/api/auth/google/exchange-code", {
+    const res = await fetch("/api/auth/icloud/connect", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        code: code,
-        client_id: clientId,
-        client_secret: clientSecret || "",
-        redirect_uri: "urn:ietf:wg:oauth:2.0:oob",
+        mode: "apple_id",
+        apple_id: user,
+        password: pass,
       }),
     });
-
     const data = await res.json();
-    if (!res.ok) throw new Error(data.detail || "Errore nello scambio del codice");
+    if (!res.ok)
+      throw new Error(data.detail || "Errore nella configurazione iCloud");
 
-    msg.className = "text-xs p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300";
-    msg.textContent = data.message;
-    logMessage(data.message, "success");
-
-    setTimeout(() => {
-      closeGoogleAuthModal();
-      checkRemotesStatus();
-    }, 1200);
+    if (data.status === "warning") {
+      statusMsg.className =
+        "text-xs p-2.5 rounded-lg bg-amber-500/10 text-amber-300 border border-amber-500/20";
+      statusMsg.textContent = data.message;
+      logMessage(data.message, "warn");
+    } else {
+      statusMsg.className =
+        "text-xs p-2.5 rounded-lg bg-emerald-500/10 text-emerald-300 border border-emerald-500/20";
+      statusMsg.textContent = "✓ " + data.message;
+      logMessage(data.message, "success");
+      setTimeout(() => {
+        closeConfigModal();
+        checkRemotesStatus();
+      }, 1200);
+    }
   } catch (err) {
-    msg.className = "text-xs p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300";
-    msg.textContent = err.message;
-    logMessage(`Errore autorizzazione Google: ${err.message}`, "error");
+    statusMsg.className =
+      "text-xs p-2.5 rounded-lg bg-rose-500/10 text-rose-300 border border-rose-500/20";
+    statusMsg.textContent = err.message;
+    logMessage(`Errore connessione iCloud: ${err.message}`, "error");
   }
 }
 
-async function submitGoogleTokenDirect() {
-  const tokenJson = document.getElementById("input-ga-token-json").value.trim();
-  const clientId = document.getElementById("input-ga-token-client-id").value.trim();
-  const clientSecret = document.getElementById("input-ga-token-client-secret").value.trim();
-  const msg = document.getElementById("ga-status-msg");
+async function saveICloudLocal() {
+  const localPath = document
+    .getElementById("cfg-icloud-local-path")
+    .value.trim();
+  const statusMsg = document.getElementById("config-status-msg");
 
-  if (!tokenJson) {
-    msg.className = "text-xs p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300";
-    msg.textContent = "Incolla il token JSON.";
+  if (!localPath) {
+    statusMsg.className =
+      "text-xs p-2.5 rounded-lg bg-rose-500/10 text-rose-300 border border-rose-500/20";
+    statusMsg.textContent =
+      "Inserisci il percorso della cartella locale di iCloud.";
+    statusMsg.classList.remove("hidden");
     return;
   }
 
-  msg.className = "text-xs p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-300";
-  msg.textContent = "Salvataggio token in corso...";
+  statusMsg.className =
+    "text-xs p-2.5 rounded-lg bg-cyan-500/10 text-cyan-300 border border-cyan-500/20";
+  statusMsg.textContent = "Collegamento cartella locale in corso...";
+  statusMsg.classList.remove("hidden");
 
   try {
-    const res = await fetch("/api/auth/google/token", {
+    const res = await fetch("/api/auth/icloud/connect", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        token_json: tokenJson,
-        client_id: clientId || null,
-        client_secret: clientSecret || null,
-      }),
+      body: JSON.stringify({ mode: "local", local_path: localPath }),
     });
-
     const data = await res.json();
-    if (!res.ok) throw new Error(data.detail || "Errore configurazione token");
+    if (!res.ok)
+      throw new Error(data.detail || "Errore nel collegamento locale");
 
-    msg.className = "text-xs p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300";
-    msg.textContent = data.message;
+    statusMsg.className =
+      "text-xs p-2.5 rounded-lg bg-emerald-500/10 text-emerald-300 border border-emerald-500/20";
+    statusMsg.textContent = "✓ " + data.message;
     logMessage(data.message, "success");
-
     setTimeout(() => {
-      closeGoogleAuthModal();
+      closeConfigModal();
       checkRemotesStatus();
     }, 1200);
   } catch (err) {
-    msg.className = "text-xs p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300";
-    msg.textContent = err.message;
-    logMessage(`Errore salvataggio token: ${err.message}`, "error");
+    statusMsg.className =
+      "text-xs p-2.5 rounded-lg bg-rose-500/10 text-rose-300 border border-rose-500/20";
+    statusMsg.textContent = err.message;
+    logMessage(`Errore collegamento cartella iCloud: ${err.message}`, "error");
+  }
+}
+
+async function submitImportConfig() {
+  const content = document.getElementById("cfg-import-text").value.trim();
+  const statusMsg = document.getElementById("config-status-msg");
+
+  if (!content) {
+    statusMsg.className =
+      "text-xs p-2.5 rounded-lg bg-rose-500/10 text-rose-300 border border-rose-500/20";
+    statusMsg.textContent =
+      "Carica o incolla il file rclone.conf prima di importare.";
+    statusMsg.classList.remove("hidden");
+    return;
+  }
+
+  statusMsg.className =
+    "text-xs p-2.5 rounded-lg bg-emerald-500/10 text-emerald-300 border border-emerald-500/20";
+  statusMsg.textContent = "Importazione rclone.conf in corso...";
+  statusMsg.classList.remove("hidden");
+
+  try {
+    const res = await fetch("/api/config/import", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content }),
+    });
+    const data = await res.json();
+    if (!res.ok)
+      throw new Error(data.detail || "Errore durante l'importazione");
+
+    statusMsg.className =
+      "text-xs p-2.5 rounded-lg bg-emerald-500/10 text-emerald-300 border border-emerald-500/20";
+    statusMsg.textContent = "✓ " + data.message;
+    logMessage(data.message, "success");
+    setTimeout(() => {
+      closeConfigModal();
+      checkRemotesStatus();
+    }, 1200);
+  } catch (err) {
+    statusMsg.className =
+      "text-xs p-2.5 rounded-lg bg-rose-500/10 text-rose-300 border border-rose-500/20";
+    statusMsg.textContent = err.message;
+    logMessage(`Errore importazione config: ${err.message}`, "error");
   }
 }
 
@@ -932,103 +1252,6 @@ async function disconnectRemote(remoteName) {
     checkRemotesStatus();
   } catch (err) {
     logMessage(`Errore disconnessione ${label}: ${err.message}`, "error");
-  }
-}
-
-// ---------------------------------------------------------------------------
-// iCloud Configuration Wizard Modal
-// ---------------------------------------------------------------------------
-
-function openConfigModal() {
-  document.getElementById("modal-config").classList.remove("hidden");
-  document.getElementById("config-status-msg").classList.add("hidden");
-}
-
-function closeConfigModal() {
-  document.getElementById("modal-config").classList.add("hidden");
-}
-
-async function saveICloudConfig() {
-  const user = document.getElementById("cfg-icloud-user").value.trim();
-  const pass = document.getElementById("cfg-icloud-pass").value.trim();
-  const statusMsg = document.getElementById("config-status-msg");
-
-  if (!user || !pass) {
-    statusMsg.className = "text-xs p-2.5 rounded-lg bg-rose-500/10 text-rose-300 border border-rose-500/20";
-    statusMsg.textContent = "Compila username Apple ID e password specifica per l'app.";
-    statusMsg.classList.remove("hidden");
-    return;
-  }
-
-  statusMsg.className = "text-xs p-2.5 rounded-lg bg-cyan-500/10 text-cyan-300 border border-cyan-500/20";
-  statusMsg.textContent = "Cifratura password e configurazione remota...";
-  statusMsg.classList.remove("hidden");
-
-  try {
-    const obsRes = await fetch("/api/remotes/obscure", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password: pass }),
-    });
-    const obsData = await obsRes.json();
-    const obscuredPass = obsData.obscured;
-
-    const confRes = await fetch("/api/remotes/configure", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: "icloud",
-        type: "webdav",
-        parameters: {
-          url: "https://p58-content.icloud.com",
-          vendor: "other",
-          user: user,
-          pass: obscuredPass,
-        },
-      }),
-    });
-
-    if (!confRes.ok) throw new Error("Errore salvataggio parametri iCloud.");
-
-    statusMsg.className = "text-xs p-2.5 rounded-lg bg-emerald-500/10 text-emerald-300 border border-emerald-500/20";
-    statusMsg.textContent = "iCloud salvato con successo! Test connessione in corso...";
-
-    setTimeout(() => {
-      testRemote("icloud");
-      checkRemotesStatus();
-    }, 1000);
-  } catch (err) {
-    statusMsg.className = "text-xs p-2.5 rounded-lg bg-rose-500/10 text-rose-300 border border-rose-500/20";
-    statusMsg.textContent = err.message;
-  }
-}
-
-async function testRemote(remoteName) {
-  const statusMsg = document.getElementById("config-status-msg");
-  statusMsg.className = "text-xs p-2.5 rounded-lg bg-slate-800 text-slate-300";
-  statusMsg.textContent = `Test connessione a ${remoteName}...`;
-  statusMsg.classList.remove("hidden");
-
-  try {
-    const res = await fetch("/api/remotes/test", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ remote: remoteName }),
-    });
-    const data = await res.json();
-
-    if (data.success) {
-      statusMsg.className = "text-xs p-2.5 rounded-lg bg-emerald-500/10 text-emerald-300 border border-emerald-500/20";
-      statusMsg.textContent = `✓ ${data.message}`;
-      logMessage(`Test ${remoteName}: Raggiungibile!`, "success");
-    } else {
-      statusMsg.className = "text-xs p-2.5 rounded-lg bg-rose-500/10 text-rose-300 border border-rose-500/20";
-      statusMsg.textContent = `✕ ${data.message}`;
-      logMessage(`Test ${remoteName}: Fallito - ${data.message}`, "error");
-    }
-  } catch (err) {
-    statusMsg.className = "text-xs p-2.5 rounded-lg bg-rose-500/10 text-rose-300 border border-rose-500/20";
-    statusMsg.textContent = err.message;
   }
 }
 
@@ -1090,11 +1313,17 @@ async function openHistoryModal() {
     container.innerHTML = "";
     entries.forEach((e) => {
       const card = document.createElement("div");
-      card.className = "p-3 rounded-xl bg-slate-950/70 border border-slate-800 text-xs flex flex-col gap-1.5";
+      card.className =
+        "p-3 rounded-xl bg-slate-950/70 border border-slate-800 text-xs flex flex-col gap-1.5";
 
       const time = new Date(e.timestamp).toLocaleString();
-      const dryTag = e.dry_run ? `<span class="bg-amber-500/20 text-amber-300 px-1.5 py-0.2 rounded text-[10px] font-mono">DRY-RUN</span>` : "";
-      const actionBadge = e.action === "copy" ? `<span class="bg-blue-500/20 text-blue-300 px-1.5 py-0.2 rounded text-[10px] font-semibold">COPIA</span>` : `<span class="bg-amber-500/20 text-amber-300 px-1.5 py-0.2 rounded text-[10px] font-semibold">SPOSTAMENTO</span>`;
+      const dryTag = e.dry_run
+        ? `<span class="bg-amber-500/20 text-amber-300 px-1.5 py-0.2 rounded text-[10px] font-mono">DRY-RUN</span>`
+        : "";
+      const actionBadge =
+        e.action === "copy"
+          ? `<span class="bg-blue-500/20 text-blue-300 px-1.5 py-0.2 rounded text-[10px] font-semibold">COPIA</span>`
+          : `<span class="bg-amber-500/20 text-amber-300 px-1.5 py-0.2 rounded text-[10px] font-semibold">SPOSTAMENTO</span>`;
 
       card.innerHTML = `
         <div class="flex items-center justify-between text-slate-400 text-[11px]">
@@ -1121,7 +1350,12 @@ function closeHistoryModal() {
 }
 
 async function clearHistoryDb() {
-  if (!confirm("Sei sicuro di voler cancellare tutto lo storico dei trasferimenti?")) return;
+  if (
+    !confirm(
+      "Sei sicuro di voler cancellare tutto lo storico dei trasferimenti?",
+    )
+  )
+    return;
   try {
     await fetch("/api/history", { method: "DELETE" });
     logMessage("Cronologia trasferimenti cancellata.", "warn");
@@ -1137,115 +1371,237 @@ async function clearHistoryDb() {
 
 function setupEventListeners() {
   // Mode selector: Move vs Copy
-  document.getElementById("btn-mode-move").addEventListener("click", () => setTransferMode(true));
-  document.getElementById("btn-mode-copy").addEventListener("click", () => setTransferMode(false));
+  document
+    .getElementById("btn-mode-move")
+    ?.addEventListener("click", () => setTransferMode(true));
+  document
+    .getElementById("btn-mode-copy")
+    ?.addEventListener("click", () => setTransferMode(false));
 
   // Top Nav Actions
-  document.getElementById("btn-nav-google-auth").addEventListener("click", () => openGoogleAuthModal("sa"));
-  document.getElementById("btn-open-config").addEventListener("click", openConfigModal);
-  document.getElementById("btn-open-history").addEventListener("click", openHistoryModal);
-  document.getElementById("btn-refresh-remotes").addEventListener("click", checkRemotesStatus);
+  document
+    .getElementById("btn-open-config")
+    ?.addEventListener("click", () => openConfigModal("gdrive"));
+  document
+    .getElementById("btn-open-history")
+    ?.addEventListener("click", openHistoryModal);
+  document
+    .getElementById("btn-refresh-remotes")
+    ?.addEventListener("click", checkRemotesStatus);
 
   // Unauth View Login Buttons
-  document.getElementById("btn-login-gdrive").addEventListener("click", () => openGoogleAuthModal("sa"));
-  document.getElementById("btn-login-gdrive-sa").addEventListener("click", () => openGoogleAuthModal("sa"));
-  document.getElementById("btn-login-icloud").addEventListener("click", openConfigModal);
+  document
+    .getElementById("btn-login-gdrive")
+    ?.addEventListener("click", startGoogleInteractiveAuth);
+  document
+    .getElementById("btn-login-gdrive-advanced")
+    ?.addEventListener("click", () => {
+      openConfigModal("gdrive");
+      toggleGDriveAdvancedFields(true);
+    });
+  document
+    .getElementById("btn-login-icloud")
+    ?.addEventListener("click", () => openConfigModal("icloud"));
 
   // Disconnect Buttons
-  document.getElementById("btn-disconnect-gdrive").addEventListener("click", () => disconnectRemote("gdrive"));
-  document.getElementById("btn-disconnect-icloud").addEventListener("click", () => disconnectRemote("icloud"));
+  document
+    .getElementById("btn-disconnect-gdrive")
+    ?.addEventListener("click", () => disconnectRemote("gdrive"));
+  document
+    .getElementById("btn-disconnect-icloud")
+    ?.addEventListener("click", () => disconnectRemote("icloud"));
 
-  // Google Auth Modal Actions
-  document.getElementById("modal-google-auth-close").addEventListener("click", closeGoogleAuthModal);
-  document.getElementById("tab-ga-sa").addEventListener("click", () => switchGoogleAuthTab("sa"));
-  document.getElementById("tab-ga-code").addEventListener("click", () => switchGoogleAuthTab("code"));
-  document.getElementById("tab-ga-token").addEventListener("click", () => switchGoogleAuthTab("token"));
+  // 1-Click Interactive Google Modal Events
+  document
+    .getElementById("btn-reopen-google-tab")
+    ?.addEventListener("click", reopenGoogleLoginTab);
+  document
+    .getElementById("btn-toggle-ga-fallback")
+    ?.addEventListener("click", toggleGoogleInteractiveFallback);
+  document
+    .getElementById("btn-submit-ga-remote")
+    ?.addEventListener("click", submitGoogleInteractiveCallback);
+  document
+    .getElementById("btn-cancel-ga-interactive")
+    ?.addEventListener("click", closeGoogleInteractiveModal);
 
-  // File upload for Service Account JSON
-  document.getElementById("input-ga-file").addEventListener("change", (e) => {
+  // Unified Config Modal Events
+  document
+    .getElementById("modal-config-close")
+    ?.addEventListener("click", closeConfigModal);
+  document
+    .getElementById("tab-btn-gdrive")
+    ?.addEventListener("click", () => switchConfigTab("gdrive"));
+  document
+    .getElementById("tab-btn-icloud")
+    ?.addEventListener("click", () => switchConfigTab("icloud"));
+  document
+    .getElementById("tab-btn-import")
+    ?.addEventListener("click", () => switchConfigTab("import"));
+
+  // Config Modal - Google Tab
+  document
+    .getElementById("btn-start-google-1click")
+    ?.addEventListener("click", () => {
+      closeConfigModal();
+      startGoogleInteractiveAuth();
+    });
+  document
+    .getElementById("btn-toggle-gdrive-advanced-fields")
+    ?.addEventListener("click", () => toggleGDriveAdvancedFields());
+  document.getElementById("input-ga-file")?.addEventListener("change", (e) => {
     const file = e.target.files[0];
     if (file) {
-      document.getElementById("ga-file-name").textContent = file.name;
+      const fileNameEl = document.getElementById("ga-file-name");
+      if (fileNameEl) fileNameEl.textContent = file.name;
       const reader = new FileReader();
       reader.onload = (event) => {
-        document.getElementById("input-ga-sa-json").value = event.target.result;
+        const txtArea = document.getElementById("cfg-gdrive-sa-json");
+        if (txtArea) txtArea.value = event.target.result;
       };
       reader.readAsText(file);
     }
   });
+  document
+    .getElementById("btn-save-gdrive-advanced")
+    ?.addEventListener("click", saveGDriveAdvanced);
 
-  document.getElementById("btn-submit-ga-sa").addEventListener("click", submitGoogleServiceAccount);
-  document.getElementById("btn-open-google-consent").addEventListener("click", openGoogleConsentWindow);
-  document.getElementById("btn-submit-ga-code").addEventListener("click", submitGoogleAuthCode);
-  document.getElementById("btn-submit-ga-token").addEventListener("click", submitGoogleTokenDirect);
+  // Config Modal - iCloud Tab
+  document
+    .getElementById("btn-subtab-icloud-cloud")
+    ?.addEventListener("click", () => switchICloudSubtab("cloud"));
+  document
+    .getElementById("btn-subtab-icloud-local")
+    ?.addEventListener("click", () => switchICloudSubtab("local"));
+  document
+    .getElementById("btn-save-icloud")
+    ?.addEventListener("click", saveICloudCloud);
+  document
+    .getElementById("btn-save-icloud-local")
+    ?.addEventListener("click", saveICloudLocal);
+
+  // Config Modal - Import Tab
+  document
+    .getElementById("input-conf-file")
+    ?.addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const txtArea = document.getElementById("cfg-import-text");
+          if (txtArea) txtArea.value = event.target.result;
+        };
+        reader.readAsText(file);
+      }
+    });
+  document
+    .getElementById("btn-submit-import-conf")
+    ?.addEventListener("click", submitImportConfig);
 
   // Cloudflare copy link
-  document.getElementById("btn-copy-tunnel").addEventListener("click", () => {
+  document.getElementById("btn-copy-tunnel")?.addEventListener("click", () => {
     if (state.tunnelUrl) {
       navigator.clipboard.writeText(state.tunnelUrl);
-      logMessage(`Link Cloudflare copiato negli appunti: ${state.tunnelUrl}`, "success");
+      logMessage(
+        `Link Cloudflare copiato negli appunti: ${state.tunnelUrl}`,
+        "success",
+      );
     }
   });
 
   // GDrive Refresh & Search & Select All
-  document.getElementById("btn-refresh-gdrive").addEventListener("click", () => loadGDrive(state.gdrivePath));
-  document.getElementById("search-gdrive").addEventListener("input", renderGDriveTable);
-  document.getElementById("btn-select-all-gdrive").addEventListener("click", () => {
-    const allSelected = state.selectedItems.size === state.gdriveItems.length;
-    if (allSelected) {
-      state.selectedItems.clear();
-    } else {
-      state.gdriveItems.forEach((item) => state.selectedItems.set(item.path, item));
-    }
-    updateSelectionUI();
-  });
-  document.getElementById("checkbox-master-gdrive").addEventListener("change", (e) => {
-    if (e.target.checked) {
-      state.gdriveItems.forEach((item) => state.selectedItems.set(item.path, item));
-    } else {
-      state.selectedItems.clear();
-    }
-    updateSelectionUI();
-  });
+  document
+    .getElementById("btn-refresh-gdrive")
+    ?.addEventListener("click", () => loadGDrive(state.gdrivePath));
+  document
+    .getElementById("search-gdrive")
+    ?.addEventListener("input", renderGDriveTable);
+  document
+    .getElementById("btn-select-all-gdrive")
+    ?.addEventListener("click", () => {
+      const allSelected = state.selectedItems.size === state.gdriveItems.length;
+      if (allSelected) {
+        state.selectedItems.clear();
+      } else {
+        state.gdriveItems.forEach((item) =>
+          state.selectedItems.set(item.path, item),
+        );
+      }
+      updateSelectionUI();
+    });
+  document
+    .getElementById("checkbox-master-gdrive")
+    ?.addEventListener("change", (e) => {
+      if (e.target.checked) {
+        state.gdriveItems.forEach((item) =>
+          state.selectedItems.set(item.path, item),
+        );
+      } else {
+        state.selectedItems.clear();
+      }
+      updateSelectionUI();
+    });
 
   // iCloud Refresh & New Folder
-  document.getElementById("btn-refresh-icloud").addEventListener("click", () => loadICloud(state.icloudPath));
-  document.getElementById("btn-new-folder-icloud").addEventListener("click", openMkdirModal);
-  document.getElementById("modal-mkdir-cancel").addEventListener("click", closeMkdirModal);
-  document.getElementById("modal-mkdir-confirm").addEventListener("click", submitMkdir);
+  document
+    .getElementById("btn-refresh-icloud")
+    ?.addEventListener("click", () => loadICloud(state.icloudPath));
+  document
+    .getElementById("btn-new-folder-icloud")
+    ?.addEventListener("click", openMkdirModal);
+  document
+    .getElementById("modal-mkdir-cancel")
+    ?.addEventListener("click", closeMkdirModal);
+  document
+    .getElementById("modal-mkdir-confirm")
+    ?.addEventListener("click", submitMkdir);
 
   // Bandwidth limit change
-  document.getElementById("select-bwlimit").addEventListener("change", async (e) => {
-    const rate = e.target.value;
-    try {
-      await fetch("/api/system/bwlimit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rate }),
-      });
-      logMessage(`Limite di banda impostato a: ${rate === "off" ? "Illimitato" : rate}`, "warn");
-    } catch (err) {
-      logMessage(`Impossibile impostare il limite di banda: ${err.message}`, "error");
-    }
-  });
+  document
+    .getElementById("select-bwlimit")
+    ?.addEventListener("change", async (e) => {
+      const rate = e.target.value;
+      try {
+        await fetch("/api/system/bwlimit", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ rate }),
+        });
+        logMessage(
+          `Limite di banda impostato a: ${rate === "off" ? "Illimitato" : rate}`,
+          "warn",
+        );
+      } catch (err) {
+        logMessage(
+          `Impossibile impostare il limite di banda: ${err.message}`,
+          "error",
+        );
+      }
+    });
 
   // Transfer Trigger Button & Modals
-  document.getElementById("btn-trigger-move").addEventListener("click", openConfirmationModal);
-  document.getElementById("modal-btn-cancel").addEventListener("click", closeConfirmationModal);
-  document.getElementById("modal-btn-proceed").addEventListener("click", executeTransfer);
-
-  // iCloud Config Modal
-  document.getElementById("modal-config-close").addEventListener("click", closeConfigModal);
-  document.getElementById("btn-test-icloud").addEventListener("click", () => testRemote("icloud"));
-  document.getElementById("btn-save-icloud").addEventListener("click", saveICloudConfig);
+  document
+    .getElementById("btn-trigger-move")
+    ?.addEventListener("click", openConfirmationModal);
+  document
+    .getElementById("modal-btn-cancel")
+    ?.addEventListener("click", closeConfirmationModal);
+  document
+    .getElementById("modal-btn-proceed")
+    ?.addEventListener("click", executeTransfer);
 
   // History Modal
-  document.getElementById("modal-history-close").addEventListener("click", closeHistoryModal);
-  document.getElementById("btn-clear-history-db").addEventListener("click", clearHistoryDb);
+  document
+    .getElementById("modal-history-close")
+    ?.addEventListener("click", closeHistoryModal);
+  document
+    .getElementById("btn-clear-history-db")
+    ?.addEventListener("click", clearHistoryDb);
 
   // Logs Clear
-  document.getElementById("btn-clear-logs").addEventListener("click", () => {
-    document.getElementById("logs-console").innerHTML = "";
+  document.getElementById("btn-clear-logs")?.addEventListener("click", () => {
+    const consoleEl = document.getElementById("logs-console");
+    if (consoleEl) consoleEl.innerHTML = "";
   });
 }
 
