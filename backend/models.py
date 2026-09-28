@@ -83,6 +83,9 @@ class TransferMoveRequest(BaseModel):
     delete_empty_src_dirs: bool = Field(
         default=True, description="Delete empty source folders"
     )
+    dry_run: bool = Field(
+        default=False, description="Simulate transfer without deleting or copying"
+    )
 
 
 class JobInfo(BaseModel):
@@ -155,3 +158,56 @@ class HealthResponse(BaseModel):
     rclone_connected: bool
     rclone_version: str | None = None
     config_file_found: bool = False
+
+
+class BandwidthLimitRequest(BaseModel):
+    """Request payload to set global transfer bandwidth throttle."""
+
+    rate: str = Field(
+        default="off", description="Bandwidth limit (e.g. 10M, 5M, 1M, off)"
+    )
+
+
+class RemoteConfigRequest(BaseModel):
+    """Request payload to configure or update a remote."""
+
+    name: str = Field(description="Remote name (gdrive or icloud)")
+    type: str = Field(description="Remote type (drive, webdav, alias, local)")
+    parameters: dict[str, str] = Field(default_factory=dict)
+    obscure: bool = Field(
+        default=False, description="Automatically obscure password fields"
+    )
+
+
+class RemoteTestRequest(BaseModel):
+    """Request to test remote connectivity."""
+
+    remote: str
+
+
+class RemoteTestResponse(BaseModel):
+    """Result of remote connectivity test."""
+
+    remote: str
+    success: bool
+    message: str
+    about: dict[str, Any] | None = None
+
+
+class ObscurePasswordRequest(BaseModel):
+    """Request payload to obscure a plaintext password."""
+
+    password: str
+
+
+class ObscurePasswordResponse(BaseModel):
+    """Obscured password string."""
+
+    obscured: str
+
+
+class TunnelStatusResponse(BaseModel):
+    """Status of Cloudflare quick tunnel."""
+
+    active: bool
+    url: str | None = None

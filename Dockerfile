@@ -1,12 +1,16 @@
 # ==============================================================================
 # CloudSync - Optimized Multi-Stage Dockerfile
-# Combines official Rclone binary and Python 3.12 + FastAPI in a single container.
+# Combines official Rclone binary, Cloudflare Tunnel, and Python 3.12 + FastAPI
+# in a single container.
 # ==============================================================================
 
 # Stage 1: Official Rclone binary extraction
 FROM rclone/rclone:latest AS rclone-bin
 
-# Stage 2: Final Production Runtime (Python 3.12)
+# Stage 2: Official Cloudflare Tunnel binary extraction
+FROM cloudflare/cloudflared:latest AS cloudflared-bin
+
+# Stage 3: Final Production Runtime (Python 3.12)
 FROM python:3.12-slim-bookworm AS runtime
 
 LABEL maintainer="CloudSync DevOps Architect"
@@ -16,9 +20,9 @@ LABEL description="Secure, in-RAM private file mover between Google Drive and iC
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     RCLONE_CONFIG=/app/config/rclone.conf \
-    RCLONE_RC_ADDR=127.0.0.1:5572 \
     RCLONE_LOG_LEVEL=INFO \
-    RCLONE_DRIVE_EXPORT_FORMATS=docx,xlsx,pptx,pdf
+    RCLONE_DRIVE_EXPORT_FORMATS=docx,xlsx,pptx,pdf \
+    ENABLE_TUNNEL=true
 
 # Install minimal OS dependencies: curl for healthcheck & rclone communication, ca-certificates for TLS
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -29,6 +33,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Copy official Rclone binary from Stage 1
 COPY --from=rclone-bin /usr/local/bin/rclone /usr/local/bin/rclone
+
+# Copy official Cloudflare Tunnel binary from Stage 2
+COPY --from=cloudflared-bin /usr/local/bin/cloudflared /usr/local/bin/cloudflared
 
 # Install 'uv' for ultra-fast, reproducible dependency management
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv

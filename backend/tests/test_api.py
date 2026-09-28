@@ -95,7 +95,7 @@ async def test_transfer_move_mocked(monkeypatch):
     """Test dispatching move jobs for file and directory."""
     job_counter = 100
 
-    async def mock_move_file(src_remote, src_path, dst_remote, dst_path):
+    async def mock_move_file(src_remote, src_path, dst_remote, dst_path, dry_run=False):
         nonlocal job_counter
         job_counter += 1
         return job_counter
@@ -107,6 +107,7 @@ async def test_transfer_move_mocked(monkeypatch):
         dst_path,
         delete_empty_src_dirs,
         export_formats,
+        dry_run=False,
     ):
         nonlocal job_counter
         job_counter += 1
@@ -171,3 +172,45 @@ async def test_job_status_mocked(monkeypatch):
         assert data["finished"] is True
         assert data["success"] is True
         assert JOB_REGISTRY[999].status == "completed"
+
+
+@pytest.mark.asyncio
+async def test_tunnel_endpoint():
+    """Verify tunnel status endpoint."""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        response = await ac.get("/api/system/tunnel")
+        assert response.status_code == 200
+        data = response.json()
+        assert "active" in data
+
+
+@pytest.mark.asyncio
+async def test_bwlimit_endpoint(monkeypatch):
+    """Verify bandwidth throttling endpoint."""
+
+    async def mock_set_bwlimit(rate):
+        return {"rate": rate}
+
+    monkeypatch.setattr(rclone_client, "set_bwlimit", mock_set_bwlimit)
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        response = await ac.post("/api/system/bwlimit", json={"rate": "10M"})
+        assert response.status_code == 200
+        data = response.json()
+        assert data["rate"] == "10M"
+
+
+@pytest.mark.asyncio
+async def test_history_endpoints():
+    """Verify history retrieval and clearing."""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        get_res = await ac.get("/api/history")
+        assert get_res.status_code == 200
+        assert isinstance(get_res.json(), list)
+
+        del_res = await ac.delete("/api/history")
+        assert del_res.status_code == 200
+        assert del_res.json()["status"] == "success"

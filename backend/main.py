@@ -27,7 +27,10 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from backend.config import settings
+from backend.demo import generate_demo_rclone_conf, setup_demo_environment
+from backend.history import HistoryEntry, HistoryItem, history_manager
 from backend.models import (
+    BandwidthLimitRequest,
     FSItem,
     FSListRequest,
     FSListResponse,
@@ -35,11 +38,17 @@ from backend.models import (
     JobInfo,
     JobStatusResponse,
     MkdirRequest,
+    ObscurePasswordRequest,
+    ObscurePasswordResponse,
+    RemoteConfigRequest,
     RemoteDetail,
     RemotesStatusResponse,
+    RemoteTestRequest,
+    RemoteTestResponse,
     TransferMoveRequest,
     TransferMoveResponse,
     TransferringItem,
+    TunnelStatusResponse,
 )
 from backend.rclone_client import RcloneAPIError, rclone_client
 
@@ -282,6 +291,7 @@ async def trigger_move(req: TransferMoveRequest):
                     export_formats=settings.drive_export_formats
                     if req.export_docs
                     else None,
+                    dry_run=req.dry_run,
                 )
             else:
                 # Move single file using operations/movefile
@@ -290,6 +300,7 @@ async def trigger_move(req: TransferMoveRequest):
                     src_path=item_path,
                     dst_remote=req.dst_remote,
                     dst_path=target_path,
+                    dry_run=req.dry_run,
                 )
 
             job_info = JobInfo(
@@ -302,8 +313,9 @@ async def trigger_move(req: TransferMoveRequest):
             JOB_REGISTRY[job_id] = job_info
             created_jobs.append(job_info)
             logger.info(
-                "Dispatched move job %d for '%s' -> '%s'",
+                "Dispatched move job %d (dry_run=%s) for '%s' -> '%s'",
                 job_id,
+                req.dry_run,
                 item_path,
                 target_path,
             )
@@ -320,6 +332,28 @@ async def trigger_move(req: TransferMoveRequest):
                 error=str(exc),
             )
             created_jobs.append(failed_job)
+
+    # Persist in history
+    history_entry = HistoryEntry(
+        id=batch_id,
+        src_remote=req.src_remote,
+        dst_remote=req.dst_remote,
+        dst_path=req.dst_path,
+        total_items=len(req.items),
+        status="running",
+        dry_run=req.dry_run,
+        items=[
+            HistoryItem(
+                path=j.item_path,
+                is_dir=j.is_dir,
+                dst_path=j.dst_path,
+                status="running" if j.job_id != -1 else "failed",
+                error=j.error,
+            )
+            for j in created_jobs
+        ],
+    )
+    history_manager.save_entry(history_entry)
 
     return TransferMoveResponse(
         message=f"Dispatched {len(created_jobs)} transfer job(s). Batch ID: {batch_id}",
@@ -491,6 +525,147 @@ async def websocket_stats(websocket: WebSocket):
             await websocket.close()
         except Exception as close_err:  # noqa: BLE001
             logger.debug("Error while closing websocket: %s", close_err)
+
+
+# ---------------------------------------------------------------------------
+# Cloudflare Tunnel & System Settings
+# ---------------------------------------------------------------------------
+
+
+@app.get("/api/system/tunnel", response_model=TunnelStatusResponse)
+async def get_tunnel_status():
+    """Check if Cloudflare Quick Tunnel is active and return the public URL."""
+    candidates = [
+        Path("/app/data/tunnel_url.txt"),
+        Path(settings.rclone_config_path).parent.parent / "data" / "tunnel_url.txt",
+        Path("data/tunnel_url.txt"),
+        Path("/tmp/tunnel_url.txt"),
+    ]
+    for p in candidates:
+        if p.exists():
+            try:
+                content = p.read_text(encoding="utf-8").strip()
+                if content.startswith("http"):
+                    return TunnelStatusResponse(active=True, url=content)
+            except Exception as e:  # noqa: BLE001
+                logger.debug("Could not read tunnel file %s: %s", p, e)
+    return TunnelStatusResponse(active=False, url=None)
+
+
+@app.post("/api/system/bwlimit")
+async def set_bandwidth_limit(req: BandwidthLimitRequest):
+    """Dynamically set transfer speed limit in Rclone (e.g. '10M', 'off')."""
+    res = await rclone_client.set_bwlimit(req.rate)
+    return {"status": "success", "rate": req.rate, "details": res}
+
+
+# ---------------------------------------------------------------------------
+# In-App Remote Diagnostics & Configuration
+# ---------------------------------------------------------------------------
+
+
+@app.post("/api/remotes/test", response_model=RemoteTestResponse)
+async def test_remote_connectivity(req: RemoteTestRequest):
+    """Test connection to a configured remote."""
+    about = await rclone_client.get_about(req.remote)
+    if "error" in about:
+        return RemoteTestResponse(
+            remote=req.remote,
+            success=False,
+            message=f"Connection failed: {about['error']}",
+            about=None,
+        )
+    return RemoteTestResponse(
+        remote=req.remote,
+        success=True,
+        message=f"Remote '{req.remote}' is reachable and active.",
+        about=about,
+    )
+
+
+@app.post("/api/remotes/configure")
+async def configure_remote(req: RemoteConfigRequest):
+    """Configure or update a remote in Rclone."""
+    try:
+        res = await rclone_client.config_create(
+            name=req.name,
+            remote_type=req.type,
+            parameters=req.parameters,
+            obscure=req.obscure,
+        )
+        return {
+            "status": "success",
+            "message": f"Remote '{req.name}' configured.",
+            "details": res,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@app.post("/api/remotes/obscure", response_model=ObscurePasswordResponse)
+async def obscure_password(req: ObscurePasswordRequest):
+    """Obscure password using Rclone native obscuring algorithm."""
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "rclone",
+            "obscure",
+            req.password,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await proc.communicate()
+        if proc.returncode != 0:
+            raise HTTPException(status_code=500, detail=stderr.decode().strip())
+        return ObscurePasswordResponse(obscured=stdout.decode().strip())
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+# ---------------------------------------------------------------------------
+# Transfer History Endpoints
+# ---------------------------------------------------------------------------
+
+
+@app.get("/api/history")
+async def get_transfer_history(limit: int = 50):
+    """Retrieve persistent transfer history log."""
+    return history_manager.get_entries(limit=limit)
+
+
+@app.delete("/api/history")
+async def clear_transfer_history():
+    """Clear all transfer history."""
+    history_manager.clear()
+    return {"status": "success", "message": "History cleared."}
+
+
+# ---------------------------------------------------------------------------
+# Zero-Setup Demo / Simulation Environment
+# ---------------------------------------------------------------------------
+
+
+@app.post("/api/demo/activate")
+async def activate_demo_environment():
+    """Set up simulated Google Drive and iCloud Drive directories for instant testing."""
+    paths = setup_demo_environment()
+    conf_content = generate_demo_rclone_conf(paths["gdrive_path"], paths["icloud_path"])
+    conf_file = Path(settings.rclone_config_path)
+    conf_file.parent.mkdir(parents=True, exist_ok=True)
+    conf_file.write_text(conf_content, encoding="utf-8")
+
+    # Re-create remotes in running rclone daemon via config_create
+    await rclone_client.config_create(
+        "gdrive", "alias", {"remote": paths["gdrive_path"]}
+    )
+    await rclone_client.config_create(
+        "icloud", "alias", {"remote": paths["icloud_path"]}
+    )
+
+    return {
+        "status": "success",
+        "message": "Modalità dimostrativa attivata. File di prova pronti in Google Drive e iCloud.",
+        "paths": paths,
+    }
 
 
 # ---------------------------------------------------------------------------

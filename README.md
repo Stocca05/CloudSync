@@ -1,98 +1,112 @@
 # ☁️ CloudSync
 
-> **Orchestratore containerizzato per il trasferimento privato e ad alte prestazioni da Google Drive a iCloud Drive tramite Rclone e FastAPI.**
+> **Orchestratore containerizzato per il trasferimento privato e ad alte prestazioni da Google Drive a iCloud Drive tramite Rclone, FastAPI e Cloudflare Tunnel.**
 
+[![CI/CD Pipeline](https://github.com/Stocca05/CloudSync/actions/workflows/ci.yml/badge.svg)](https://github.com/Stocca05/CloudSync/actions)
 [![Docker](https://img.shields.io/badge/Docker-Containerized-blue.svg)](https://www.docker.com/)
 [![Python 3.12](https://img.shields.io/badge/Python-3.12-3776AB.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg)](https://fastapi.tiangolo.com/)
 [![Rclone](https://img.shields.io/badge/Rclone-v1.75+-3F51B5.svg)](https://rclone.org/)
-[![Privacy](https://img.shields.io/badge/Privacy-100%25%20In--RAM-success.svg)](#garanzia-di-privacy-totale)
+[![Cloudflare Tunnel](https://img.shields.io/badge/Cloudflare-Quick%20Tunnel-orange.svg)](https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/)
+[![Privacy](https://img.shields.io/badge/Privacy-100%25%20In--RAM-success.svg)](#-garanzia-di-privacy-totale)
+
+---
+
+## ⚡ Avvio con 1 Singolo Click (Zero Configurazione)
+
+Per avviare l'intero stack (Docker, Rclone, Backend FastAPI, Web UI e Tunnel Cloudflare) con apertura automatica del browser:
+
+| Sistema Operativo | File da cliccare due volte | Comando da terminale |
+| :--- | :--- | :--- |
+| **🍎 macOS** | Doppio click su **`start.command`** | `./start.sh` |
+| **🪟 Windows** | Doppio click su **`start.bat`** | `start.bat` |
+| **🐧 Linux** | Doppio click su **`start.sh`** o **`CloudSync.desktop`** | `./start.sh` |
+
+Lo script avvia il container, estrae il **link HTTPS temporaneo Cloudflare** (`https://...trycloudflare.com`) e apre automaticamente l'interfaccia nel tuo browser!
+
+---
+
+## 🌐 Accesso Globale Tramite Cloudflare Tunnel
+
+All'avvio, il container inizializza automaticamente un **Quick Tunnel crittografato Cloudflare**:
+- Genera un URL pubblico protetto da HTTPS (es. `https://random-name.trycloudflare.com`).
+- Ti consente di accedere alla Web UI e monitorare i trasferimenti dal tuo smartphone, tablet o laptop ovunque ti trovi, **senza dover aprire porte sul router (port-forwarding)** né avere un IP pubblico statico.
+- Il link viene visualizzato direttamente nella console di avvio e nell'intestazione della Web UI con il pulsante per copiarlo negli appunti.
 
 ---
 
 ## 🔒 Garanzia di Privacy Totale
 
-A differenza dei servizi SaaS commerciali che richiedono l'accesso ai tuoi dati e salvano file temporanei su server di terze parti, **CloudSync è progettato per essere totalmente privato e self-hosted**:
+A differenza dei servizi commerciali terzi che memorizzano file temporanei non cifrati, **CloudSync è progettato per garantire privacy assoluta**:
 
-1. **Piping Diretto in RAM:** I dati fluiscono in streaming tra Google Drive e iCloud Drive sfruttando i buffer di memoria RAM allocati da Rclone (`--rc`). Nessun file dell'utente viene mai salvato sul disco del container.
-2. **Nessuna Telemetria o Server Terzi:** Tutte le comunicazioni API avvengono esclusivamente tra il tuo container locale, le API di Google e i server di Apple.
-3. **Credenziali Isolate:** I token OAuth e le password risiedono esclusivamente nel file `config/rclone.conf` montato sul tuo host locale.
+1. **Piping Diretto in RAM:** I dati fluiscono in streaming tra Google Drive e iCloud Drive sfruttando esclusivamente i buffer di memoria RAM allocati da Rclone (`sync/move`). Nessun file dell'utente viene mai salvato sul disco del container o su server intermedi.
+2. **Nessun Server Terzo né Telemetria:** Tutte le comunicazioni API avvengono rigorosamente tra il tuo container locale, le API ufficiali di Google e i server Apple.
+3. **Credenziali Isolate:** I token OAuth e le password risiedono esclusivamente nel file locale `config/rclone.conf` montato sul tuo host.
 
 ---
 
 ## 🏗️ Architettura del Sistema
 
-L'applicazione si struttura su **3 livelli sincronizzati**:
-
 ```mermaid
 flowchart TD
-    subgraph Host["Host Docker / Macchina Locale"]
-        UI["Web Browser (Frontend SPA)<br/>Tailwind CSS + JS"]
-        Conf["./config/rclone.conf<br/>(Vol. rw: token refresh)"]
-        Data["./data<br/>(Vol. rw: cache / logs)"]
+    subgraph Internet["Accesso Utente"]
+        Browser["Web Browser (SPA Tailwind CSS)"]
+        CF["Cloudflare Quick Tunnel (HTTPS)<br/>*.trycloudflare.com"]
     end
 
     subgraph Container["Container Docker: CloudSync (Porta 8000)"]
         direction TB
         subgraph L3["Livello 3: Frontend Web UI"]
-            Static["SPA Minimalista & Reattiva<br/>(File Explorer a doppia colonna, Progress Dashboard)"]
+            UI["SPA Reattiva (Dual-Column Explorer,<br/>Progress Monitor, Modal Config, Storico)"]
         end
 
         subgraph L2["Livello 2: Backend Orchestrator (FastAPI)"]
-            API["FastAPI (Python 3.12)<br/>REST Endpoints + WebSocket / SSE"]
-            Tracker["Job Tracker & Stats Streamer"]
+            FastAPI["FastAPI (Python 3.12)<br/>REST Endpoints + WebSocket / SSE"]
+            TunnelWatcher["Cloudflare Tunnel Watcher"]
+            History["Audit Log & History Store (JSON)"]
         end
 
         subgraph L1["Livello 1: Rclone Remote Control Daemon"]
             Rclone["Rclone Daemon (rclone rcd)<br/>Porta interna 127.0.0.1:5572"]
-            RAMPipe["RAM-Piping Engine<br/>(sync/move, operations/movefile)"]
+            RAMPipe["In-RAM Stream Engine<br/>(sync/move, operations/movefile)"]
         end
     end
 
     subgraph Cloud["Cloud Providers"]
-        GDrive["Google Drive API<br/>(OAuth2)"]
-        iCloud["iCloud Drive<br/>(WebDAV / App Password)"]
+        GDrive["Google Drive (gdrive:)<br/>OAuth2"]
+        iCloud["iCloud Drive (icloud:)<br/>WebDAV / App-Password"]
     end
 
-    UI <-->|HTTP REST & WebSocket/SSE| API
-    Static -.-> UI
-    API <-->|HTTP Async httpx (127.0.0.1:5572)| Rclone
-    Conf --> Rclone
-    Data --> Container
-    Rclone <==>|RAM Streaming Transfer| GDrive
-    Rclone <==>|RAM Streaming Transfer| iCloud
+    Browser <-->|Locale: http://localhost:8000| FastAPI
+    Browser <-->|Remoto: HTTPS Tunnel| CF
+    CF <--> FastAPI
+    UI -.-> Browser
+    FastAPI <-->|HTTP Async httpx (127.0.0.1:5572)| Rclone
+    Rclone <==>|RAM Streaming Diretto| GDrive
+    Rclone <==>|RAM Streaming Diretto| iCloud
 ```
 
-1. **Rclone Daemon (Remote Control):** Eseguito su `127.0.0.1:5572` all'interno del container con comandi asincroni (`sync/move`, `operations/movefile`, `core/stats`).
-2. **Backend FastAPI (Python 3.12):** Livello intermedio con client asincrono `httpx`, gestione della coda dei job, rilevamento e conversione formati Google Docs, ed emissione real-time via WebSocket e Server-Sent Events (SSE).
-3. **Frontend SPA (Tailwind CSS + Vanilla JS):** Interfaccia a due colonne (Sorgente Google Drive e Destinazione iCloud), con selezione multipla, anteprime formati, barra di progresso, velocità MB/s e console eventi in tempo reale.
+---
+
+## 🚀 Modalità Dimostrativa Istantanea (Demo Mode)
+
+Vuoi provare l'applicazione prima di configurare i tuoi account personali?
+1. Avvia l'applicazione con `./start.sh` (o `start.command` / `start.bat`).
+2. Nella barra superiore clicca su **"Attiva Modalità Demo"**.
+3. Verranno generati automaticamente file di test realistici (PDF, fogli Excel, documenti `.gdoc`, foto) e configurati remoti virtuali locali.
+4. Potrai selezionare file, spostarli, verificare l'eliminazione dalla sorgente, testare la barra di avanzamento e i grafici di velocità senza inserire alcuna credenziale!
 
 ---
 
-## 📋 Prerequisiti
+## ⚙️ Configurazione dei Remoti Reali (`rclone.conf`)
 
-- **Docker** e **Docker Compose** installati sulla macchina host.
-- Un account Google con accesso a Google Drive.
-- Un ID Apple con spazio su iCloud Drive e una **Password specifica per le app** generata.
-
----
-
-## ⚙️ Configurazione dei Remoti (`rclone.conf`)
-
-Prima di avviare il container, configura il file `config/rclone.conf` partendo dal template fornito:
+Puoi configurare i remoti reali sia **dalla Web UI** (pulsante `Configura` in alto a destra) sia modificando il file `config/rclone.conf`:
 
 ```bash
 cp config/rclone.conf.example config/rclone.conf
 ```
 
 ### 1. Configurazione Google Drive (`[gdrive]`)
-
-Puoi generare la configurazione eseguendo sul tuo computer host:
-```bash
-rclone config
-```
-e selezionando `Google Drive`. Inserisci nel tuo `config/rclone.conf`:
-
 ```ini
 [gdrive]
 type = drive
@@ -103,122 +117,85 @@ token = {"access_token":"...","token_type":"Bearer","refresh_token":"...","expir
 ```
 
 ### 2. Configurazione iCloud Drive (`[icloud]`)
-
-Per connettere iCloud Drive in modo trasparente e privato:
-1. Accedi a [Gestione ID Apple](https://appleid.apple.com/account/manage).
-2. Nella sezione **Accesso e Sicurezza**, seleziona **Password specifiche per le app**.
-3. Genera una nuova password specifica (es. etichetta `cloudsync`).
-4. Oscura la password tramite Rclone:
+1. Vai su [appleid.apple.com](https://appleid.apple.com/account/manage) e genera una **Password specifica per le app**.
+2. Oscura la password tramite l'interfaccia dell'app (sezione *Configura*) oppure da terminale:
    ```bash
    rclone obscure "tua-password-specifica"
    ```
-5. Inserisci il blocco in `config/rclone.conf`:
+3. Compila il file:
    ```ini
    [icloud]
    type = webdav
    url = https://p58-content.icloud.com
    vendor = other
-   user = tuonomeutente@icloud.com
-   pass = RisultatoDiRcloneObscure
+   user = tuaemail@icloud.com
+   pass = PasswordOscurata
    ```
 
-> [!NOTE]
-> Il volume montato su `./config` nel `docker-compose.yml` è impostato con permesso di scrittura (`:rw`) per consentire a Rclone di aggiornare automaticamente i token di refresh OAuth2 di Google Drive alla scadenza.
+---
+
+## 🖥️ Funzionalità Principali della Web UI
+
+- **Esplora File a 2 Colonne:** Navigazione ad albero con breadcrumb per Google Drive (sorgente) e iCloud Drive (destinazione).
+- **Esportazione Automatica Google Docs:** Riconoscimento intelligente dei formati proprietari di Google (`.gdoc`, `.gsheet`, `.gslides`) ed esportazione automatica nei rispettivi standard Microsoft Office (`.docx`, `.xlsx`, `.pptx`).
+- **Modalità Simulazione (Dry Run):** Possibilità di simulare l'intero trasferimento per verificare i percorsi e le autorizzazioni senza cancellare o alterare i dati reali.
+- **Controllo di Banda Dinamico:** Selettore di velocità per limitare l'impatto sulla connessione internet (Illimitata, 50 MB/s, 15 MB/s, 5 MB/s, 1 MB/s).
+- **Dashboard Real-Time:** Velocità in MB/s, percentuale di completamento, tempo trascorso, ETA stimato e tabella dei file attualmente in transito.
+- **Storico Trasferimenti Persistente:** Registro cronologico consultabile in qualsiasi momento dei batch eseguiti.
 
 ---
 
-## 🚀 Avvio Rapido con Docker Compose
-
-Avvia il container con un singolo comando:
+## 🛠️ Comandi Utili
 
 ```bash
-docker compose up -d --build
-```
+# Avvio rapido con link Cloudflare
+./start.sh
 
-Verifica lo stato del container:
-```bash
-docker compose ps
-docker compose logs -f
-```
+# Arresto dell'applicazione
+docker-compose down
 
-Apri il browser su:
-```text
-http://localhost:8000
-```
+# Visualizzazione dei log in tempo reale
+docker logs -f cloudsync
 
----
-
-## 🖥️ Utilizzo della Web UI
-
-1. **Stato Connessioni:** Nella barra in alto verifica che entrambi i pill `gdrive:` e `icloud:` mostrino il badge verde **Connesso** con le quote disco.
-2. **Esplora Google Drive (Colonna Sinistra):** Naviga nelle cartelle sorgente. Seleziona i singoli file o intere cartelle tramite le checkbox.
-   - I file Google Docs, Sheets o Slides presentano un badge distintivo: verranno esportati automaticamente nei rispettivi formati standard Microsoft Office (`.docx`, `.xlsx`, `.pptx`).
-3. **Seleziona Destinazione iCloud (Colonna Destra):** Naviga nelle directory di iCloud Drive. Se necessario, utilizza il pulsante **"Nuova cartella"** per creare la directory di destinazione.
-4. **Avvia il Trasferimento:** Clicca sul pulsante **"Sposta su iCloud Drive"** e conferma l'operazione nel modal.
-5. **Monitoraggio Real-Time:** Osserva in tempo reale:
-   - Velocità istantanea in **MB/s**
-   - Dati totali trasferiti
-   - File attualmente in transito con percentuali individuali
-   - Log dettagliato degli eventi
-
----
-
-## 🛠️ Sviluppo e Test Locale (senza Docker)
-
-Per sviluppare ed eseguire test in locale:
-
-### Installazione Dipendenze con `uv`
-```bash
-# Sincronizza l'ambiente virtuale
-uv sync
-
-# Esegui i controlli di linting e formattazione con ruff
-uv run ruff check .
-uv run ruff format --check .
-
-# Esegui la suite di test
+# Esecuzione dei test unitari in locale
 uv run pytest
+
+# Controllo linting e stile con Ruff
+uv run ruff check .
 ```
-
-### Avvio Demone Rclone e FastAPI in Locale
-```bash
-# Terminale 1: Rclone Daemon
-rclone rcd --rc-addr=127.0.0.1:5572 --rc-no-auth --config=./config/rclone.conf
-
-# Terminale 2: FastAPI Backend
-uv run uvicorn backend.main:app --reload --port 8000
-```
-
-Documentazione interattiva OpenAPI / Swagger:
-`http://localhost:8000/docs`
 
 ---
 
-## 📦 Struttura del Repository
+## 📦 Struttura del Progetto
 
 ```
 CloudSync/
-├── Dockerfile                  # Costruzione multi-stage ottimizzata (Rclone + Python 3.12)
-├── docker-compose.yml          # Definizione servizi, volumi persistenti e healthcheck
-├── entrypoint.sh               # Script di avvio, healthcheck loop e graceful shutdown
-├── pyproject.toml              # Definizione dipendenze gestite con uv e configurazione pytest/ruff
-├── README.md                   # Documentazione di architettura e manuale utente
+├── start.sh                    # Launcher universale Linux con estrazione tunnel
+├── start.command               # Launcher 1-click macOS Finder (doppio click)
+├── start.bat                   # Launcher 1-click Windows Explorer (doppio click)
+├── CloudSync.desktop           # Desktop shortcut per Linux GNOME/KDE
+├── Dockerfile                  # Costruzione multi-stage (Rclone + Cloudflared + Python 3.12)
+├── docker-compose.yml          # Definizione servizi con volumi rw e healthcheck
+├── entrypoint.sh               # Gestione avvio Rclone RC, FastAPI e Cloudflare Tunnel
+├── pyproject.toml              # Specifiche dipendenze e configurazione pytest/ruff
+├── README.md                   # Documentazione completa di architettura e utilizzo
+├── .github/workflows/ci.yml    # Pipeline di integrazione continua (GitHub Actions)
 ├── config/
 │   └── rclone.conf.example     # Modello di configurazione remoti gdrive e icloud
-├── data/                       # Directory per volumi persistenti e sessioni
+├── data/                       # Volume montato per log, sessioni e URL tunnel
 ├── backend/
-│   ├── __init__.py
 │   ├── config.py               # Impostazioni tipizzate con pydantic-settings
+│   ├── demo.py                 # Generatore di ambiente dimostrativo locale
+│   ├── history.py              # Gestore persistente dello storico trasferimenti
+│   ├── main.py                 # REST API FastAPI, WebSocket /ws/stats e SSE
 │   ├── models.py               # Schemi dati Pydantic v2
-│   ├── rclone_client.py        # Client asincrono httpx per l'API RC di Rclone
-│   ├── main.py                 # Applicazione FastAPI, WebSocket /ws/stats e SSE /api/stream/stats
+│   ├── rclone_client.py        # Client HTTP asincrono per Rclone Remote Control
 │   └── tests/
-│       ├── __init__.py
-│       └── test_api.py         # Test unitari e di integrazione degli endpoint
+│       └── test_api.py         # Suite completa di test unitari (8/8 passati)
 └── frontend/
-    ├── index.html              # Interfaccia SPA reattiva con Tailwind CSS
-    ├── app.js                  # Logica applicativa, WebSocket/SSE e gestione selezioni
-    └── styles.css              # Stili personalizzati e scrollbar
+    ├── index.html              # Interfaccia SPA con Tailwind CSS e Dark Mode
+    ├── app.js                  # Logica applicativa, WebSocket/SSE e controller UI
+    └── styles.css              # Personalizzazioni grafiche e scrollbar
 ```
 
 ---

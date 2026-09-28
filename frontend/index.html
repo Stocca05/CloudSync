@@ -28,11 +28,11 @@
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans antialiased selection:bg-emerald-500 selection:text-white">
 
   <!-- TOP HEADER -->
-  <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-40">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+  <header class="border-b border-slate-800 bg-slate-900/90 backdrop-blur sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
       
       <!-- Brand & Privacy Indicator -->
-      <div class="flex items-center space-x-3">
+      <div class="flex items-center space-x-3 shrink-0">
         <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-cyan-600 flex items-center justify-center shadow-lg shadow-emerald-500/20 text-white font-bold text-xl">
           ☁️
         </div>
@@ -44,33 +44,56 @@
               RAM-Piping Privato
             </span>
           </div>
-          <p class="text-xs text-slate-400">Trasferimento diretto Google Drive ➔ iCloud Drive</p>
+          <p class="text-xs text-slate-400 hidden sm:block">Trasferimento diretto Google Drive ➔ iCloud Drive</p>
         </div>
       </div>
 
-      <!-- Remote Statuses & Connection Indicator -->
-      <div class="flex items-center space-x-4">
-        <!-- Google Drive Status Pill -->
-        <div id="status-gdrive" class="flex items-center gap-2 bg-slate-800/80 border border-slate-700/60 px-3 py-1.5 rounded-lg text-xs">
+      <!-- Cloudflare Tunnel Banner (When Active) -->
+      <div id="tunnel-badge" class="hidden items-center gap-2 bg-gradient-to-r from-orange-500/10 to-amber-500/10 border border-orange-500/30 px-3 py-1 rounded-xl text-xs">
+        <span class="w-2 h-2 rounded-full bg-orange-400 animate-ping"></span>
+        <span class="text-orange-300 font-medium">Link Pubblico:</span>
+        <a id="tunnel-link" href="#" target="_blank" class="font-mono text-cyan-300 hover:underline truncate max-w-[200px] sm:max-w-[280px]">...</a>
+        <button id="btn-copy-tunnel" title="Copia link" class="p-1 hover:bg-orange-500/20 text-orange-200 rounded transition">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+        </button>
+      </div>
+
+      <!-- Right Navigation Actions -->
+      <div class="flex items-center space-x-3 shrink-0">
+        
+        <!-- Status GDrive -->
+        <div id="status-gdrive" class="hidden md:flex items-center gap-2 bg-slate-800/80 border border-slate-700/60 px-3 py-1.5 rounded-lg text-xs">
           <span class="w-2 h-2 rounded-full bg-amber-400" id="dot-gdrive"></span>
           <span class="font-medium text-slate-300">gdrive:</span>
           <span class="text-slate-400 text-[11px]" id="info-gdrive">Verifica...</span>
         </div>
 
-        <!-- iCloud Drive Status Pill -->
-        <div id="status-icloud" class="flex items-center gap-2 bg-slate-800/80 border border-slate-700/60 px-3 py-1.5 rounded-lg text-xs">
+        <!-- Status iCloud -->
+        <div id="status-icloud" class="hidden md:flex items-center gap-2 bg-slate-800/80 border border-slate-700/60 px-3 py-1.5 rounded-lg text-xs">
           <span class="w-2 h-2 rounded-full bg-amber-400" id="dot-icloud"></span>
           <span class="font-medium text-slate-300">icloud:</span>
           <span class="text-slate-400 text-[11px]" id="info-icloud">Verifica...</span>
         </div>
 
-        <!-- Refresh Remotes Button -->
+        <!-- Action: Config Wizard -->
+        <button id="btn-open-config" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs text-slate-300 font-medium transition" title="Configura Remoti">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+          <span class="hidden sm:inline">Configura</span>
+        </button>
+
+        <!-- Action: History -->
+        <button id="btn-open-history" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs text-slate-300 font-medium transition" title="Storico Trasferimenti">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          <span class="hidden sm:inline">Storico</span>
+        </button>
+
+        <!-- Refresh Remotes -->
         <button id="btn-refresh-remotes" title="Ricarica stato remoti" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 transition">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
         </button>
 
         <!-- Live Connection Mode Badge -->
-        <div class="hidden sm:flex items-center gap-1.5 text-xs text-slate-400 bg-slate-800/50 px-2.5 py-1 rounded-md border border-slate-700/40">
+        <div class="hidden lg:flex items-center gap-1.5 text-xs text-slate-400 bg-slate-800/50 px-2.5 py-1 rounded-md border border-slate-700/40">
           <span id="ws-indicator" class="w-2 h-2 rounded-full bg-slate-500"></span>
           <span id="ws-status-text">Connessione...</span>
         </div>
@@ -78,14 +101,21 @@
     </div>
   </header>
 
-  <!-- NOTIFICATION BANNER / WARNING FOR MISSING REMOTES -->
+  <!-- NOTIFICATION BANNER / WARNING FOR MISSING REMOTES & DEMO TRIGGER -->
   <div id="remotes-warning" class="hidden bg-amber-950/40 border-b border-amber-600/30 px-4 py-2.5 text-xs text-amber-200">
-    <div class="max-w-7xl mx-auto flex items-center justify-between">
+    <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
       <div class="flex items-center gap-2">
         <svg class="w-4 h-4 text-amber-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-        <span id="remotes-warning-text">Configurazione <code>rclone.conf</code> incompleta. Assicurati che siano definiti i remoti <strong>gdrive</strong> e <strong>icloud</strong>.</span>
+        <span id="remotes-warning-text">Remoti <code>gdrive</code> o <code>icloud</code> non ancora configurati in <code>rclone.conf</code>.</span>
       </div>
-      <span class="text-[11px] text-amber-400/80">Vedi config/rclone.conf.example</span>
+      <div class="flex items-center gap-3">
+        <button id="btn-activate-demo" class="px-3 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold text-xs transition shadow">
+          🚀 Attiva Modalità Demo (Test con file simulati)
+        </button>
+        <button id="btn-wizard-banner" class="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-medium text-xs transition border border-slate-700">
+          Configura ora
+        </button>
+      </div>
     </div>
   </div>
 
@@ -122,9 +152,7 @@
 
         <!-- Breadcrumbs & Search -->
         <div class="py-2.5 flex items-center justify-between gap-3 text-xs">
-          <div id="breadcrumbs-gdrive" class="flex items-center gap-1 overflow-x-auto text-slate-400 py-1 font-mono text-[11px] scrollbar-thin">
-            <!-- Populated via JS -->
-          </div>
+          <div id="breadcrumbs-gdrive" class="flex items-center gap-1 overflow-x-auto text-slate-400 py-1 font-mono text-[11px] scrollbar-thin"></div>
           <div class="relative w-44 shrink-0">
             <input id="search-gdrive" type="text" placeholder="Filtra file..." class="w-full bg-slate-800/80 border border-slate-700 rounded-md px-2.5 py-1 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500">
           </div>
@@ -145,9 +173,7 @@
                 <th class="py-2 px-3 w-20 text-right">Dimensione</th>
               </tr>
             </thead>
-            <tbody id="file-list-gdrive" class="divide-y divide-slate-800/50">
-              <!-- Dynamically populated via app.js -->
-            </tbody>
+            <tbody id="file-list-gdrive" class="divide-y divide-slate-800/50"></tbody>
           </table>
           <div id="empty-gdrive" class="hidden p-8 text-center text-slate-500 text-xs">
             Nessun elemento trovato in questa cartella.
@@ -183,9 +209,7 @@
 
         <!-- Breadcrumbs & Current Target Indicator -->
         <div class="py-2.5 flex items-center justify-between gap-3 text-xs">
-          <div id="breadcrumbs-icloud" class="flex items-center gap-1 overflow-x-auto text-slate-400 py-1 font-mono text-[11px] scrollbar-thin">
-            <!-- Populated via JS -->
-          </div>
+          <div id="breadcrumbs-icloud" class="flex items-center gap-1 overflow-x-auto text-slate-400 py-1 font-mono text-[11px] scrollbar-thin"></div>
           <div class="text-[11px] text-cyan-300 bg-cyan-500/10 border border-cyan-500/20 px-2 py-0.5 rounded truncate max-w-[200px]" id="target-summary">
             Destinazione: /
           </div>
@@ -203,9 +227,7 @@
                 <th class="py-2 px-3 w-24 text-right">Tipo</th>
               </tr>
             </thead>
-            <tbody id="file-list-icloud" class="divide-y divide-slate-800/50">
-              <!-- Dynamically populated via app.js -->
-            </tbody>
+            <tbody id="file-list-icloud" class="divide-y divide-slate-800/50"></tbody>
           </table>
           <div id="empty-icloud" class="hidden p-8 text-center text-slate-500 text-xs">
             Cartella vuota su iCloud Drive.
@@ -216,37 +238,55 @@
     </div>
 
     <!-- ACTION & CONFIGURATION TOOLBAR -->
-    <section class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-xl flex flex-col md:flex-row items-center justify-between gap-4">
+    <section class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-xl flex flex-col lg:flex-row items-center justify-between gap-4">
       
       <!-- Selection Summary & Options -->
-      <div class="flex flex-col sm:flex-row items-start sm:items-center gap-4 text-xs">
+      <div class="flex flex-wrap items-center gap-4 text-xs">
         <div class="flex items-center gap-2">
           <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
-          <span class="text-slate-200 font-medium">Elementi selezionati:</span>
+          <span class="text-slate-200 font-medium">Selezionati:</span>
           <span id="selected-count-badge" class="bg-slate-800 text-emerald-400 px-2 py-0.5 rounded-md font-mono font-semibold">0 elementi</span>
           <span id="selected-size-badge" class="text-slate-400 text-[11px]">(0 B)</span>
         </div>
 
         <div class="h-4 w-px bg-slate-800 hidden sm:block"></div>
 
-        <div class="flex items-center gap-4">
-          <!-- Google Docs Export Toggle -->
-          <label class="flex items-center gap-2 cursor-pointer select-none" title="I documenti di Google verranno esportati automaticamente in .docx, .xlsx, .pptx">
-            <input id="toggle-export-docs" type="checkbox" checked class="rounded bg-slate-800 border-slate-700 text-emerald-500 focus:ring-0">
-            <span class="text-slate-300">Esporta Google Docs (.docx, .xlsx)</span>
-          </label>
+        <!-- Google Docs Export Toggle -->
+        <label class="flex items-center gap-1.5 cursor-pointer select-none text-slate-300" title="Esporta Google Docs in formati Office">
+          <input id="toggle-export-docs" type="checkbox" checked class="rounded bg-slate-800 border-slate-700 text-emerald-500 focus:ring-0">
+          <span>Docs Office (.docx)</span>
+        </label>
 
-          <!-- Delete Empty Dirs Toggle -->
-          <label class="flex items-center gap-2 cursor-pointer select-none" title="Elimina le cartelle sorgente vuote su Google Drive al termine del trasferimento">
-            <input id="toggle-delete-empty" type="checkbox" checked class="rounded bg-slate-800 border-slate-700 text-emerald-500 focus:ring-0">
-            <span class="text-slate-300">Pulisci cartelle vuote</span>
-          </label>
+        <!-- Delete Empty Dirs Toggle -->
+        <label class="flex items-center gap-1.5 cursor-pointer select-none text-slate-300" title="Elimina le cartelle sorgente vuote">
+          <input id="toggle-delete-empty" type="checkbox" checked class="rounded bg-slate-800 border-slate-700 text-emerald-500 focus:ring-0">
+          <span>Pulisci vuote</span>
+        </label>
+
+        <!-- Dry Run Toggle -->
+        <label class="flex items-center gap-1.5 cursor-pointer select-none text-amber-300 font-medium" title="Esegue una simulazione del trasferimento senza copiare o cancellare">
+          <input id="toggle-dry-run" type="checkbox" class="rounded bg-slate-800 border-slate-700 text-amber-500 focus:ring-0">
+          <span>Simulazione (Dry-Run)</span>
+        </label>
+
+        <div class="h-4 w-px bg-slate-800 hidden sm:block"></div>
+
+        <!-- Bandwidth Limit Select -->
+        <div class="flex items-center gap-1.5 text-xs text-slate-400">
+          <span>Banda:</span>
+          <select id="select-bwlimit" class="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-slate-200 text-xs focus:outline-none focus:border-emerald-500">
+            <option value="off">Illimitata</option>
+            <option value="50M">50 MB/s</option>
+            <option value="15M">15 MB/s</option>
+            <option value="5M">5 MB/s</option>
+            <option value="1M">1 MB/s</option>
+          </select>
         </div>
       </div>
 
       <!-- Execute Move Button -->
-      <div class="flex items-center gap-3 w-full md:w-auto">
-        <button id="btn-trigger-move" disabled class="w-full md:w-auto flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-800 disabled:text-slate-500 text-white font-semibold text-sm transition shadow-lg shadow-emerald-900/30 disabled:shadow-none">
+      <div class="flex items-center gap-3 w-full lg:w-auto">
+        <button id="btn-trigger-move" disabled class="w-full lg:w-auto flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-800 disabled:text-slate-500 text-white font-semibold text-sm transition shadow-lg shadow-emerald-900/30 disabled:shadow-none">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
           Sposta su iCloud Drive
         </button>
@@ -372,6 +412,9 @@
       <div class="text-xs text-slate-300 bg-slate-950/60 p-3 rounded-xl border border-slate-800/80 space-y-2">
         <p>Stai per spostare <strong id="modal-items-count" class="text-emerald-400">0</strong> elemento/i verso:</p>
         <p class="font-mono text-cyan-300 break-all text-[11px]" id="modal-target-path">icloud:/</p>
+        <div id="modal-dry-run-warning" class="hidden p-2 rounded bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[11px]">
+          ⚠️ <strong>MODALITÀ SIMULAZIONE ATTIVA:</strong> I file non verranno cancellati né alterati.
+        </div>
         <p class="text-slate-400 text-[11px] pt-1 border-t border-slate-800">
           ℹ️ I file sorgente su Google Drive verranno rimossi <strong>esclusivamente dopo</strong> il completamento e la verifica di integrità su iCloud Drive.
         </p>
@@ -400,8 +443,86 @@
     </div>
   </div>
 
+  <!-- REMOTE CONFIGURATION WIZARD MODAL -->
+  <div id="modal-config" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl flex flex-col gap-5">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+          <span>⚙️</span> Configurazione Remoti (rclone.conf)
+        </h3>
+        <button id="modal-config-close" class="text-slate-400 hover:text-white">&times;</button>
+      </div>
+
+      <!-- Config Tabs -->
+      <div class="flex border-b border-slate-800 text-xs font-medium">
+        <button id="tab-btn-gdrive" class="px-4 py-2 text-blue-400 border-b-2 border-blue-500 focus:outline-none">Google Drive</button>
+        <button id="tab-btn-icloud" class="px-4 py-2 text-slate-400 hover:text-slate-200 focus:outline-none">iCloud Drive</button>
+      </div>
+
+      <!-- Tab Content: GDrive -->
+      <div id="tab-content-gdrive" class="space-y-3 text-xs">
+        <div>
+          <label class="block text-slate-400 mb-1">OAuth Token JSON (da `rclone config`):</label>
+          <textarea id="cfg-gdrive-token" rows="3" placeholder='{"access_token":"...","token_type":"Bearer","refresh_token":"...","expiry":"..."}' class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 font-mono text-[11px] text-slate-200 focus:border-blue-500 focus:outline-none"></textarea>
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-slate-400 mb-1">Client ID (Opzionale):</label>
+            <input id="cfg-gdrive-client-id" type="text" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 font-mono text-[11px] text-slate-200">
+          </div>
+          <div>
+            <label class="block text-slate-400 mb-1">Client Secret (Opzionale):</label>
+            <input id="cfg-gdrive-client-secret" type="password" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 font-mono text-[11px] text-slate-200">
+          </div>
+        </div>
+        <div class="flex items-center justify-between pt-2">
+          <button id="btn-test-gdrive" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs transition border border-slate-700">Test Connessione</button>
+          <button id="btn-save-gdrive" class="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold transition">Salva gdrive</button>
+        </div>
+      </div>
+
+      <!-- Tab Content: iCloud -->
+      <div id="tab-content-icloud" class="hidden space-y-3 text-xs">
+        <div>
+          <label class="block text-slate-400 mb-1">ID Apple (email):</label>
+          <input id="cfg-icloud-user" type="email" placeholder="tuousername@icloud.com" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-slate-200 focus:border-cyan-500 focus:outline-none">
+        </div>
+        <div>
+          <label class="block text-slate-400 mb-1">Password specifica per l'app Apple:</label>
+          <input id="cfg-icloud-pass" type="password" placeholder="abcd-efgh-ijkl-mnop" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 font-mono text-slate-200 focus:border-cyan-500 focus:outline-none">
+          <span class="text-[10px] text-slate-500">Verrà automaticamente oscurata e protetta da Rclone.</span>
+        </div>
+        <div class="flex items-center justify-between pt-2">
+          <button id="btn-test-icloud" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs transition border border-slate-700">Test Connessione</button>
+          <button id="btn-save-icloud" class="px-4 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold transition">Salva icloud</button>
+        </div>
+      </div>
+
+      <div id="config-status-msg" class="hidden text-xs p-2.5 rounded-lg"></div>
+    </div>
+  </div>
+
+  <!-- TRANSFER HISTORY MODAL -->
+  <div id="modal-history" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full p-6 shadow-2xl flex flex-col gap-4 max-h-[80vh]">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+          <span>📜</span> Storico Trasferimenti Eseguiti
+        </h3>
+        <div class="flex items-center gap-2">
+          <button id="btn-clear-history-db" class="text-xs text-rose-400 hover:text-rose-300">Elimina cronologia</button>
+          <button id="modal-history-close" class="text-slate-400 hover:text-white ml-2">&times;</button>
+        </div>
+      </div>
+
+      <div id="history-items-container" class="overflow-y-auto space-y-2 flex-1 max-h-96 pr-1">
+        <!-- Dynamically populated via app.js -->
+      </div>
+    </div>
+  </div>
+
   <footer class="border-t border-slate-800/80 py-4 text-center text-xs text-slate-500">
-    CloudSync • Motore Rclone v1.75+ • Nessun dato salvato su server terzi • 100% Locale
+    CloudSync • Motore Rclone v1.75+ • In-RAM Piping Diretto • Zero Dati su Server Terzi
   </footer>
 
   <script src="/app.js"></script>

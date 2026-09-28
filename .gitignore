@@ -53,3 +53,7 @@ out/
 .idea/
 *.swp
 *.swo
+
+# CloudSync Runtime
+config/rclone.conf
+data/

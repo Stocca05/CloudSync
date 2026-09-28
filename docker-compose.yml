@@ -15,9 +15,9 @@ services:
       - "8000:8000"
     environment:
       - RCLONE_CONFIG=/app/config/rclone.conf
-      - RCLONE_RC_ADDR=127.0.0.1:5572
       - RCLONE_LOG_LEVEL=INFO
       - RCLONE_DRIVE_EXPORT_FORMATS=docx,xlsx,pptx,pdf
+      - ENABLE_TUNNEL=true
       - PYTHONUNBUFFERED=1
     volumes:
       # Volume di configurazione montato in lettura/scrittura (rw)
