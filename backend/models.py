@@ -77,6 +77,10 @@ class TransferMoveRequest(BaseModel):
     dst_remote: str = Field(default="icloud", description="Destination remote name")
     dst_path: str = Field(default="", description="Destination directory path")
     items: list[TransferItem] = Field(description="List of files and folders to move")
+    delete_source: bool = Field(
+        default=True,
+        description="If True, delete source files after transfer (Move). If False, keep source files on Google Drive (Copy).",
+    )
     export_docs: bool = Field(
         default=True, description="Export Google Docs to Office formats"
     )
@@ -211,3 +215,54 @@ class TunnelStatusResponse(BaseModel):
 
     active: bool
     url: str | None = None
+
+
+class GoogleServiceAccountAuthRequest(BaseModel):
+    """Request payload to authenticate with Google Drive using a Service Account JSON."""
+
+    service_account_json: str = Field(
+        description="Raw JSON content or pasted string of the Google Cloud Service Account key"
+    )
+    folder_id: str | None = Field(
+        default=None,
+        description="Optional Google Drive root/shared folder ID to scope operations to",
+    )
+
+
+class GoogleOAuthTokenAuthRequest(BaseModel):
+    """Request payload to configure Google Drive via an OAuth token JSON blob."""
+
+    token_json: str = Field(description="JSON blob of the OAuth token")
+    client_id: str | None = Field(
+        default=None, description="Custom Google OAuth Client ID"
+    )
+    client_secret: str | None = Field(
+        default=None, description="Custom Google OAuth Client Secret"
+    )
+
+
+class GoogleOAuthExchangeRequest(BaseModel):
+    """Request payload to exchange an authorization code for an OAuth token."""
+
+    code: str = Field(description="Google OAuth authorization code")
+    client_id: str = Field(description="Google OAuth Client ID")
+    client_secret: str = Field(description="Google OAuth Client Secret")
+    redirect_uri: str = Field(
+        default="urn:ietf:wg:oauth:2.0:oob",
+        description="Redirect URI used during authorization",
+    )
+
+
+class GoogleAuthResponse(BaseModel):
+    """Response returned upon connecting Google Drive."""
+
+    success: bool
+    message: str
+    remote: str = "gdrive"
+    email: str | None = None
+
+
+class DisconnectRemoteRequest(BaseModel):
+    """Request to remove/disconnect a remote."""
+
+    remote: str = Field(description="Remote name to disconnect (e.g. gdrive or icloud)")

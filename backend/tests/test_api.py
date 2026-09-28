@@ -214,3 +214,112 @@ async def test_history_endpoints():
         del_res = await ac.delete("/api/history")
         assert del_res.status_code == 200
         assert del_res.json()["status"] == "success"
+
+
+@pytest.mark.asyncio
+async def test_transfer_copy_mocked(monkeypatch):
+    """Test dispatching copy jobs (delete_source=False) without deleting source files."""
+    copy_file_called = False
+    copy_dir_called = False
+
+    async def mock_copy_file(src_remote, src_path, dst_remote, dst_path, dry_run=False):
+        nonlocal copy_file_called
+        copy_file_called = True
+        return 201
+
+    async def mock_copy_dir(
+        src_remote, src_path, dst_remote, dst_path, export_formats, dry_run=False
+    ):
+        nonlocal copy_dir_called
+        copy_dir_called = True
+        return 202
+
+    monkeypatch.setattr(rclone_client, "copy_file", mock_copy_file)
+    monkeypatch.setattr(rclone_client, "copy_directory", mock_copy_dir)
+
+    payload = {
+        "src_remote": "gdrive",
+        "dst_remote": "icloud",
+        "dst_path": "BackupCopy",
+        "items": [
+            {"path": "file1.txt", "is_dir": False},
+            {"path": "my_folder", "is_dir": True},
+        ],
+        "delete_source": False,  # COPY MODE!
+        "export_docs": True,
+    }
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        response = await ac.post("/api/transfer/move", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["jobs"]) == 2
+        assert copy_file_called is True
+        assert copy_dir_called is True
+        assert "copia" in data["message"].lower()
+
+
+@pytest.mark.asyncio
+async def test_google_service_account_auth(monkeypatch):
+    """Test Service Account JSON authentication endpoint."""
+    config_created = {}
+
+    async def mock_config_create(name, remote_type, parameters, obscure=False):
+        nonlocal config_created
+        config_created = {"name": name, "type": remote_type, "params": parameters}
+        return {"status": "ok"}
+
+    monkeypatch.setattr(rclone_client, "config_create", mock_config_create)
+
+    valid_sa = {
+        "type": "service_account",
+        "project_id": "test-project",
+        "client_email": "bot@test-project.iam.gserviceaccount.com",
+        "private_key": "-----BEGIN RSA PRIVATE KEY-----\nMIIE...\n-----END RSA PRIVATE KEY-----\n",
+    }
+
+    import json
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        # Valid payload
+        res = await ac.post(
+            "/api/auth/google/service-account",
+            json={
+                "service_account_json": json.dumps(valid_sa),
+                "folder_id": "https://drive.google.com/drive/folders/ABC12345",
+            },
+        )
+        assert res.status_code == 200
+        data = res.json()
+        assert data["success"] is True
+        assert data["email"] == "bot@test-project.iam.gserviceaccount.com"
+        assert config_created["name"] == "gdrive"
+        assert config_created["params"]["root_folder_id"] == "ABC12345"
+
+        # Invalid payload (not a service account)
+        invalid_res = await ac.post(
+            "/api/auth/google/service-account",
+            json={"service_account_json": json.dumps({"foo": "bar"})},
+        )
+        assert invalid_res.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_disconnect_remote(monkeypatch):
+    """Test remote disconnect endpoint."""
+    deleted_remote = None
+
+    async def mock_config_delete(name):
+        nonlocal deleted_remote
+        deleted_remote = name
+        return {}
+
+    monkeypatch.setattr(rclone_client, "config_delete", mock_config_delete)
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        res = await ac.post("/api/remotes/disconnect", json={"remote": "gdrive"})
+        assert res.status_code == 200
+        assert deleted_remote == "gdrive"

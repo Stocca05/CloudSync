@@ -31,9 +31,14 @@ from backend.demo import generate_demo_rclone_conf, setup_demo_environment
 from backend.history import HistoryEntry, HistoryItem, history_manager
 from backend.models import (
     BandwidthLimitRequest,
+    DisconnectRemoteRequest,
     FSItem,
     FSListRequest,
     FSListResponse,
+    GoogleAuthResponse,
+    GoogleOAuthExchangeRequest,
+    GoogleOAuthTokenAuthRequest,
+    GoogleServiceAccountAuthRequest,
     HealthResponse,
     JobInfo,
     JobStatusResponse,
@@ -254,10 +259,12 @@ async def create_directory(req: MkdirRequest):
 
 @app.post("/api/transfer/move", response_model=TransferMoveResponse)
 async def trigger_move(req: TransferMoveRequest):
-    """Trigger background asynchronous move jobs for selected files and directories.
+    """Trigger background asynchronous transfer jobs (Move or Copy) for selected items.
 
-    Files are moved using Rclone's operations/movefile, while folders are moved
-    via sync/move (which cleans up empty source folders upon verification).
+    When delete_source=True:
+      Files are moved using operations/movefile, folders via sync/move (source deleted).
+    When delete_source=False:
+      Files are copied using operations/copyfile, folders via sync/copy (source preserved).
     """
     if not req.items:
         raise HTTPException(
@@ -268,6 +275,7 @@ async def trigger_move(req: TransferMoveRequest):
     batch_id = str(uuid.uuid4())[:8]
     created_jobs: list[JobInfo] = []
     dst_base = req.dst_path.strip("/")
+    action_name = "move" if req.delete_source else "copy"
 
     for item in req.items:
         item_path = item.path.lstrip("/")
@@ -280,28 +288,49 @@ async def trigger_move(req: TransferMoveRequest):
             target_path = item_name
 
         try:
-            if item.is_dir:
-                # Move directory recursively using sync/move
-                job_id = await rclone_client.move_directory(
-                    src_remote=req.src_remote,
-                    src_path=item_path,
-                    dst_remote=req.dst_remote,
-                    dst_path=target_path,
-                    delete_empty_src_dirs=req.delete_empty_src_dirs,
-                    export_formats=settings.drive_export_formats
-                    if req.export_docs
-                    else None,
-                    dry_run=req.dry_run,
-                )
+            if req.delete_source:
+                # Mode MOVE: Delete source upon successful transfer
+                if item.is_dir:
+                    job_id = await rclone_client.move_directory(
+                        src_remote=req.src_remote,
+                        src_path=item_path,
+                        dst_remote=req.dst_remote,
+                        dst_path=target_path,
+                        delete_empty_src_dirs=req.delete_empty_src_dirs,
+                        export_formats=settings.drive_export_formats
+                        if req.export_docs
+                        else None,
+                        dry_run=req.dry_run,
+                    )
+                else:
+                    job_id = await rclone_client.move_file(
+                        src_remote=req.src_remote,
+                        src_path=item_path,
+                        dst_remote=req.dst_remote,
+                        dst_path=target_path,
+                        dry_run=req.dry_run,
+                    )
             else:
-                # Move single file using operations/movefile
-                job_id = await rclone_client.move_file(
-                    src_remote=req.src_remote,
-                    src_path=item_path,
-                    dst_remote=req.dst_remote,
-                    dst_path=target_path,
-                    dry_run=req.dry_run,
-                )
+                # Mode COPY: Keep source files intact
+                if item.is_dir:
+                    job_id = await rclone_client.copy_directory(
+                        src_remote=req.src_remote,
+                        src_path=item_path,
+                        dst_remote=req.dst_remote,
+                        dst_path=target_path,
+                        export_formats=settings.drive_export_formats
+                        if req.export_docs
+                        else None,
+                        dry_run=req.dry_run,
+                    )
+                else:
+                    job_id = await rclone_client.copy_file(
+                        src_remote=req.src_remote,
+                        src_path=item_path,
+                        dst_remote=req.dst_remote,
+                        dst_path=target_path,
+                        dry_run=req.dry_run,
+                    )
 
             job_info = JobInfo(
                 job_id=job_id,
@@ -313,15 +342,19 @@ async def trigger_move(req: TransferMoveRequest):
             JOB_REGISTRY[job_id] = job_info
             created_jobs.append(job_info)
             logger.info(
-                "Dispatched move job %d (dry_run=%s) for '%s' -> '%s'",
+                "Dispatched %s job %d (dry_run=%s, delete_source=%s) for '%s' -> '%s'",
+                action_name,
                 job_id,
                 req.dry_run,
+                req.delete_source,
                 item_path,
                 target_path,
             )
 
         except Exception as exc:  # noqa: BLE001
-            logger.error("Failed to dispatch move for '%s': %s", item_path, exc)
+            logger.error(
+                "Failed to dispatch %s for '%s': %s", action_name, item_path, exc
+            )
             # Create a failed job representation for visibility
             failed_job = JobInfo(
                 job_id=-1,
@@ -336,6 +369,8 @@ async def trigger_move(req: TransferMoveRequest):
     # Persist in history
     history_entry = HistoryEntry(
         id=batch_id,
+        action=action_name,
+        delete_source=req.delete_source,
         src_remote=req.src_remote,
         dst_remote=req.dst_remote,
         dst_path=req.dst_path,
@@ -355,8 +390,9 @@ async def trigger_move(req: TransferMoveRequest):
     )
     history_manager.save_entry(history_entry)
 
+    verb = "spostamento" if req.delete_source else "copia"
     return TransferMoveResponse(
-        message=f"Dispatched {len(created_jobs)} transfer job(s). Batch ID: {batch_id}",
+        message=f"Avviati {len(created_jobs)} job di {verb}. Batch ID: {batch_id}",
         batch_id=batch_id,
         jobs=created_jobs,
     )
@@ -600,6 +636,180 @@ async def configure_remote(req: RemoteConfigRequest):
         }
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@app.post("/api/remotes/disconnect")
+async def disconnect_remote(req: DisconnectRemoteRequest):
+    """Disconnect and remove remote configuration."""
+    try:
+        res = await rclone_client.config_delete(req.remote)
+        return {
+            "status": "success",
+            "message": f"Remote '{req.remote}' rimosso con successo.",
+            "details": res,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+# ---------------------------------------------------------------------------
+# Alternative Google Drive Authentication Methods
+# ---------------------------------------------------------------------------
+
+
+@app.post("/api/auth/google/service-account", response_model=GoogleAuthResponse)
+async def auth_google_service_account(req: GoogleServiceAccountAuthRequest):
+    """Authenticate Google Drive using a Service Account JSON."""
+    raw_json = req.service_account_json.strip()
+    try:
+        sa_data = json.loads(raw_json)
+    except json.JSONDecodeError as err:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Formato JSON della Service Account non valido: {err}",
+        ) from err
+
+    if sa_data.get("type") != "service_account" or "client_email" not in sa_data:
+        raise HTTPException(
+            status_code=400,
+            detail="Il JSON fornito non è una chiave Service Account Google valida (manca 'type': 'service_account' o 'client_email').",
+        )
+
+    client_email = sa_data.get("client_email")
+    params: dict[str, str] = {
+        "scope": "drive",
+        "service_account_credentials": json.dumps(sa_data),
+    }
+
+    if req.folder_id and req.folder_id.strip():
+        clean_id = req.folder_id.strip()
+        if "folders/" in clean_id:
+            clean_id = clean_id.split("folders/")[1].split("?")[0].strip("/")
+        params["root_folder_id"] = clean_id
+
+    try:
+        await rclone_client.config_create(
+            name="gdrive",
+            remote_type="drive",
+            parameters=params,
+        )
+        return GoogleAuthResponse(
+            success=True,
+            message=f"Google Drive collegato con successo tramite Service Account ({client_email}).",
+            remote="gdrive",
+            email=client_email,
+        )
+    except Exception as exc:
+        logger.error("Errore configurazione Service Account Google: %s", exc)
+        raise HTTPException(
+            status_code=400,
+            detail=f"Impossibile configurare Google Drive con la Service Account: {exc}",
+        ) from exc
+
+
+@app.post("/api/auth/google/token", response_model=GoogleAuthResponse)
+async def auth_google_token(req: GoogleOAuthTokenAuthRequest):
+    """Authenticate Google Drive using an OAuth token JSON blob."""
+    token_str = req.token_json.strip()
+    try:
+        token_obj = json.loads(token_str)
+        if "access_token" not in token_obj:
+            raise ValueError("Manca il campo 'access_token' nel token JSON.")
+    except Exception as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Token JSON non valido: {exc}",
+        ) from exc
+
+    params: dict[str, str] = {
+        "scope": "drive",
+        "token": json.dumps(token_obj),
+    }
+    if req.client_id and req.client_id.strip():
+        params["client_id"] = req.client_id.strip()
+    if req.client_secret and req.client_secret.strip():
+        params["client_secret"] = req.client_secret.strip()
+
+    try:
+        await rclone_client.config_create(
+            name="gdrive",
+            remote_type="drive",
+            parameters=params,
+        )
+        return GoogleAuthResponse(
+            success=True,
+            message="Google Drive collegato con successo tramite OAuth Token.",
+            remote="gdrive",
+        )
+    except Exception as exc:
+        logger.error("Errore configurazione OAuth Token Google: %s", exc)
+        raise HTTPException(
+            status_code=400,
+            detail=f"Errore configurazione OAuth Token: {exc}",
+        ) from exc
+
+
+@app.post("/api/auth/google/exchange-code", response_model=GoogleAuthResponse)
+async def auth_google_exchange_code(req: GoogleOAuthExchangeRequest):
+    """Exchange a Google OAuth authorization code for tokens and configure gdrive."""
+    token_url = "https://oauth2.googleapis.com/token"
+    payload = {
+        "code": req.code.strip(),
+        "client_id": req.client_id.strip(),
+        "client_secret": req.client_secret.strip(),
+        "redirect_uri": req.redirect_uri.strip(),
+        "grant_type": "authorization_code",
+    }
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.post(token_url, data=payload)
+            if resp.status_code != 200:
+                err_detail = resp.text
+                try:
+                    err_json = resp.json()
+                    err_detail = err_json.get("error_description", err_detail)
+                except (json.JSONDecodeError, ValueError) as parse_err:
+                    logger.debug("Response was not JSON: %s", parse_err)
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Scambio codice fallito da Google: {err_detail}",
+                )
+            token_data = resp.json()
+    except httpx.HTTPError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Impossibile contattare i server Google per lo scambio codice: {exc}",
+        ) from exc
+
+    rclone_token = {
+        "access_token": token_data.get("access_token"),
+        "token_type": token_data.get("token_type", "Bearer"),
+        "refresh_token": token_data.get("refresh_token"),
+        "expiry": token_data.get("expiry"),
+    }
+    params: dict[str, str] = {
+        "scope": "drive",
+        "client_id": req.client_id.strip(),
+        "client_secret": req.client_secret.strip(),
+        "token": json.dumps(rclone_token),
+    }
+
+    try:
+        await rclone_client.config_create(
+            name="gdrive",
+            remote_type="drive",
+            parameters=params,
+        )
+        return GoogleAuthResponse(
+            success=True,
+            message="Autenticazione Google completata con successo! Account collegato.",
+            remote="gdrive",
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Errore nella registrazione in Rclone: {exc}",
+        ) from exc
 
 
 @app.post("/api/remotes/obscure", response_model=ObscurePasswordResponse)

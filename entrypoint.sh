@@ -25,12 +25,8 @@ rm -f /app/data/tunnel_url.txt
 
 if [ ! -f "$RCLONE_CONFIG_FILE" ]; then
     echo "⚠️  ATTENZIONE: File di configurazione '$RCLONE_CONFIG_FILE' non trovato."
-    if [ -f "/app/config/rclone.conf.example" ]; then
-        echo "ℹ️  Creazione file segnaposto da rclone.conf.example..."
-        cp /app/config/rclone.conf.example "$RCLONE_CONFIG_FILE"
-    else
-        touch "$RCLONE_CONFIG_FILE"
-    fi
+    echo "ℹ️  Inizializzazione file di configurazione rclone.conf..."
+    touch "$RCLONE_CONFIG_FILE"
     echo "👉 Configura i remoti 'gdrive' e 'icloud' montando il tuo rclone.conf in ./config/"
 fi
 

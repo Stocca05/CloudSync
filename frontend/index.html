@@ -64,21 +64,27 @@
         <!-- Status GDrive -->
         <div id="status-gdrive" class="hidden md:flex items-center gap-2 bg-slate-800/80 border border-slate-700/60 px-3 py-1.5 rounded-lg text-xs">
           <span class="w-2 h-2 rounded-full bg-amber-400" id="dot-gdrive"></span>
-          <span class="font-medium text-slate-300">gdrive:</span>
+          <span class="font-medium text-slate-300">Google Drive:</span>
           <span class="text-slate-400 text-[11px]" id="info-gdrive">Verifica...</span>
         </div>
 
         <!-- Status iCloud -->
         <div id="status-icloud" class="hidden md:flex items-center gap-2 bg-slate-800/80 border border-slate-700/60 px-3 py-1.5 rounded-lg text-xs">
           <span class="w-2 h-2 rounded-full bg-amber-400" id="dot-icloud"></span>
-          <span class="font-medium text-slate-300">icloud:</span>
+          <span class="font-medium text-slate-300">iCloud:</span>
           <span class="text-slate-400 text-[11px]" id="info-icloud">Verifica...</span>
         </div>
 
-        <!-- Action: Config Wizard -->
-        <button id="btn-open-config" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs text-slate-300 font-medium transition" title="Configura Remoti">
+        <!-- Action: Google Login Modal -->
+        <button id="btn-nav-google-auth" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600/90 hover:bg-blue-500 border border-blue-500/50 text-xs text-white font-medium transition shadow-sm" title="Accedi con Google">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M12.24 10.285V14.4h6.806c-.275 1.765-2.056 5.174-6.806 5.174-4.095 0-7.439-3.389-7.439-7.574s3.345-7.574 7.439-7.574c2.33 0 3.891.989 4.785 1.849l3.254-3.138C18.189 1.186 15.479 0 12.24 0c-6.635 0-12 5.365-12 12s5.365 12 12 12c6.926 0 11.52-4.869 11.52-11.726 0-.788-.085-1.39-.189-1.989H12.24z"/></svg>
+          <span class="hidden sm:inline">Account Google</span>
+        </button>
+
+        <!-- Action: Config Remotes -->
+        <button id="btn-open-config" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs text-slate-300 font-medium transition" title="Configura iCloud o Remoti">
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-          <span class="hidden sm:inline">Configura</span>
+          <span class="hidden sm:inline">Configura iCloud</span>
         </button>
 
         <!-- Action: History -->
@@ -101,24 +107,6 @@
     </div>
   </header>
 
-  <!-- NOTIFICATION BANNER / WARNING FOR MISSING REMOTES & DEMO TRIGGER -->
-  <div id="remotes-warning" class="hidden bg-amber-950/40 border-b border-amber-600/30 px-4 py-2.5 text-xs text-amber-200">
-    <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-      <div class="flex items-center gap-2">
-        <svg class="w-4 h-4 text-amber-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-        <span id="remotes-warning-text">Remoti <code>gdrive</code> o <code>icloud</code> non ancora configurati in <code>rclone.conf</code>.</span>
-      </div>
-      <div class="flex items-center gap-3">
-        <button id="btn-activate-demo" class="px-3 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold text-xs transition shadow">
-          🚀 Attiva Modalità Demo (Test con file simulati)
-        </button>
-        <button id="btn-wizard-banner" class="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-medium text-xs transition border border-slate-700">
-          Configura ora
-        </button>
-      </div>
-    </div>
-  </div>
-
   <!-- MAIN CONTAINER -->
   <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 flex flex-col gap-6">
 
@@ -126,7 +114,9 @@
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
 
       <!-- LEFT COLUMN: SORGENTE GOOGLE DRIVE -->
-      <section class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl flex flex-col h-[560px]">
+      <section class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl flex flex-col h-[560px] relative overflow-hidden">
+        
+        <!-- Header Column -->
         <div class="flex items-center justify-between pb-3 border-b border-slate-800">
           <div class="flex items-center gap-2">
             <div class="p-1.5 bg-blue-500/10 text-blue-400 rounded-lg">
@@ -137,12 +127,16 @@
                 Google Drive (Sorgente)
                 <span class="text-[10px] bg-blue-500/20 text-blue-300 px-1.5 py-0.2 rounded font-mono">gdrive:</span>
               </h2>
-              <p class="text-xs text-slate-400">Seleziona file o cartelle da spostare</p>
+              <p class="text-xs text-slate-400">File e cartelle da trasferire</p>
             </div>
           </div>
+          
           <div class="flex items-center gap-2">
-            <button id="btn-select-all-gdrive" class="text-xs text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 px-2.5 py-1 rounded-md transition">
+            <button id="btn-select-all-gdrive" class="hidden text-xs text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 px-2.5 py-1 rounded-md transition">
               Seleziona tutto
+            </button>
+            <button id="btn-disconnect-gdrive" class="hidden text-xs text-rose-400 hover:text-rose-300 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 px-2.5 py-1 rounded-md transition" title="Disconnetti account Google">
+              Disconnetti
             </button>
             <button id="btn-refresh-gdrive" title="Aggiorna" class="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-md transition">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
@@ -150,39 +144,67 @@
           </div>
         </div>
 
-        <!-- Breadcrumbs & Search -->
-        <div class="py-2.5 flex items-center justify-between gap-3 text-xs">
-          <div id="breadcrumbs-gdrive" class="flex items-center gap-1 overflow-x-auto text-slate-400 py-1 font-mono text-[11px] scrollbar-thin"></div>
-          <div class="relative w-44 shrink-0">
-            <input id="search-gdrive" type="text" placeholder="Filtra file..." class="w-full bg-slate-800/80 border border-slate-700 rounded-md px-2.5 py-1 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500">
+        <!-- STATE A: CONNECTED VIEW -->
+        <div id="view-connected-gdrive" class="hidden flex-1 flex flex-col min-h-0">
+          <!-- Breadcrumbs & Search -->
+          <div class="py-2.5 flex items-center justify-between gap-3 text-xs">
+            <div id="breadcrumbs-gdrive" class="flex items-center gap-1 overflow-x-auto text-slate-400 py-1 font-mono text-[11px] scrollbar-thin"></div>
+            <div class="relative w-44 shrink-0">
+              <input id="search-gdrive" type="text" placeholder="Filtra file..." class="w-full bg-slate-800/80 border border-slate-700 rounded-md px-2.5 py-1 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500">
+            </div>
+          </div>
+
+          <!-- File List / Table -->
+          <div class="flex-1 overflow-y-auto border border-slate-800/80 rounded-xl bg-slate-950/40 relative">
+            <div id="loading-gdrive" class="hidden absolute inset-0 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center z-10">
+              <div class="animate-spin rounded-full h-7 w-7 border-2 border-blue-500 border-t-transparent"></div>
+            </div>
+            <table class="w-full text-left text-xs text-slate-300">
+              <thead class="bg-slate-900/90 text-slate-400 uppercase text-[10px] tracking-wider sticky top-0 border-b border-slate-800">
+                <tr>
+                  <th class="py-2 px-3 w-8 text-center">
+                    <input id="checkbox-master-gdrive" type="checkbox" class="rounded bg-slate-800 border-slate-700 text-blue-500 focus:ring-0">
+                  </th>
+                  <th class="py-2 px-2">Nome</th>
+                  <th class="py-2 px-3 w-20 text-right">Dimensione</th>
+                </tr>
+              </thead>
+              <tbody id="file-list-gdrive" class="divide-y divide-slate-800/50"></tbody>
+            </table>
+            <div id="empty-gdrive" class="hidden p-8 text-center text-slate-500 text-xs">
+              Nessun elemento trovato in questa cartella.
+            </div>
           </div>
         </div>
 
-        <!-- File List / Table -->
-        <div class="flex-1 overflow-y-auto border border-slate-800/80 rounded-xl bg-slate-950/40 relative">
-          <div id="loading-gdrive" class="hidden absolute inset-0 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center z-10">
-            <div class="animate-spin rounded-full h-7 w-7 border-2 border-blue-500 border-t-transparent"></div>
+        <!-- STATE B: UNAUTHENTICATED / LOGIN PROMPT VIEW -->
+        <div id="view-unauth-gdrive" class="flex-1 flex flex-col items-center justify-center p-6 text-center">
+          <div class="w-16 h-16 rounded-2xl bg-blue-500/10 text-blue-400 flex items-center justify-center mb-4 ring-1 ring-blue-500/20">
+            <svg class="w-8 h-8" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12.24 10.285V14.4h6.806c-.275 1.765-2.056 5.174-6.806 5.174-4.095 0-7.439-3.389-7.439-7.574s3.345-7.574 7.439-7.574c2.33 0 3.891.989 4.785 1.849l3.254-3.138C18.189 1.186 15.479 0 12.24 0c-6.635 0-12 5.365-12 12s5.365 12 12 12c6.926 0 11.52-4.869 11.52-11.726 0-.788-.085-1.39-.189-1.989H12.24z"/>
+            </svg>
           </div>
-          <table class="w-full text-left text-xs text-slate-300">
-            <thead class="bg-slate-900/90 text-slate-400 uppercase text-[10px] tracking-wider sticky top-0 border-b border-slate-800">
-              <tr>
-                <th class="py-2 px-3 w-8 text-center">
-                  <input id="checkbox-master-gdrive" type="checkbox" class="rounded bg-slate-800 border-slate-700 text-blue-500 focus:ring-0">
-                </th>
-                <th class="py-2 px-2">Nome</th>
-                <th class="py-2 px-3 w-20 text-right">Dimensione</th>
-              </tr>
-            </thead>
-            <tbody id="file-list-gdrive" class="divide-y divide-slate-800/50"></tbody>
-          </table>
-          <div id="empty-gdrive" class="hidden p-8 text-center text-slate-500 text-xs">
-            Nessun elemento trovato in questa cartella.
+          <h3 class="text-base font-bold text-white mb-1.5">Collega il tuo Account Google</h3>
+          <p class="text-xs text-slate-400 max-w-sm mb-6 leading-relaxed">
+            Nessun account Google collegato. Effettua l'accesso per esplorare i tuoi file e trasferirli in modo 100% privato su iCloud Drive.
+          </p>
+          <div class="flex flex-col sm:flex-row items-center gap-3">
+            <button id="btn-login-gdrive" class="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs transition shadow-lg shadow-blue-900/30">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"/></svg>
+              <span>Accedi con Google</span>
+            </button>
+            <button id="btn-login-gdrive-sa" class="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-xs border border-slate-700 transition">
+              <span>Usa Service Account (JSON)</span>
+            </button>
           </div>
         </div>
+
       </section>
 
       <!-- RIGHT COLUMN: DESTINAZIONE ICLOUD DRIVE -->
-      <section class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl flex flex-col h-[560px]">
+      <section class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl flex flex-col h-[560px] relative overflow-hidden">
+        
+        <!-- Header Column -->
         <div class="flex items-center justify-between pb-3 border-b border-slate-800">
           <div class="flex items-center gap-2">
             <div class="p-1.5 bg-cyan-500/10 text-cyan-400 rounded-lg">
@@ -193,13 +215,17 @@
                 iCloud Drive (Destinazione)
                 <span class="text-[10px] bg-cyan-500/20 text-cyan-300 px-1.5 py-0.2 rounded font-mono">icloud:</span>
               </h2>
-              <p class="text-xs text-slate-400">Naviga e seleziona la cartella di arrivo</p>
+              <p class="text-xs text-slate-400">Cartella di arrivo su iCloud</p>
             </div>
           </div>
+          
           <div class="flex items-center gap-2">
-            <button id="btn-new-folder-icloud" class="flex items-center gap-1 text-xs text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 px-2.5 py-1 rounded-md transition">
+            <button id="btn-new-folder-icloud" class="hidden flex items-center gap-1 text-xs text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 px-2.5 py-1 rounded-md transition">
               <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
               Nuova cartella
+            </button>
+            <button id="btn-disconnect-icloud" class="hidden text-xs text-rose-400 hover:text-rose-300 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 px-2.5 py-1 rounded-md transition" title="Disconnetti iCloud">
+              Disconnetti
             </button>
             <button id="btn-refresh-icloud" title="Aggiorna" class="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-md transition">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
@@ -207,32 +233,51 @@
           </div>
         </div>
 
-        <!-- Breadcrumbs & Current Target Indicator -->
-        <div class="py-2.5 flex items-center justify-between gap-3 text-xs">
-          <div id="breadcrumbs-icloud" class="flex items-center gap-1 overflow-x-auto text-slate-400 py-1 font-mono text-[11px] scrollbar-thin"></div>
-          <div class="text-[11px] text-cyan-300 bg-cyan-500/10 border border-cyan-500/20 px-2 py-0.5 rounded truncate max-w-[200px]" id="target-summary">
-            Destinazione: /
+        <!-- STATE A: CONNECTED VIEW -->
+        <div id="view-connected-icloud" class="hidden flex-1 flex flex-col min-h-0">
+          <!-- Breadcrumbs & Current Target Indicator -->
+          <div class="py-2.5 flex items-center justify-between gap-3 text-xs">
+            <div id="breadcrumbs-icloud" class="flex items-center gap-1 overflow-x-auto text-slate-400 py-1 font-mono text-[11px] scrollbar-thin"></div>
+            <div class="text-[11px] text-cyan-300 bg-cyan-500/10 border border-cyan-500/20 px-2 py-0.5 rounded truncate max-w-[200px]" id="target-summary">
+              Destinazione: /
+            </div>
+          </div>
+
+          <!-- iCloud Directory Tree List -->
+          <div class="flex-1 overflow-y-auto border border-slate-800/80 rounded-xl bg-slate-950/40 relative">
+            <div id="loading-icloud" class="hidden absolute inset-0 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center z-10">
+              <div class="animate-spin rounded-full h-7 w-7 border-2 border-cyan-500 border-t-transparent"></div>
+            </div>
+            <table class="w-full text-left text-xs text-slate-300">
+              <thead class="bg-slate-900/90 text-slate-400 uppercase text-[10px] tracking-wider sticky top-0 border-b border-slate-800">
+                <tr>
+                  <th class="py-2 px-3">Cartella / File</th>
+                  <th class="py-2 px-3 w-24 text-right">Tipo</th>
+                </tr>
+              </thead>
+              <tbody id="file-list-icloud" class="divide-y divide-slate-800/50"></tbody>
+            </table>
+            <div id="empty-icloud" class="hidden p-8 text-center text-slate-500 text-xs">
+              Cartella vuota su iCloud Drive.
+            </div>
           </div>
         </div>
 
-        <!-- iCloud Directory Tree List -->
-        <div class="flex-1 overflow-y-auto border border-slate-800/80 rounded-xl bg-slate-950/40 relative">
-          <div id="loading-icloud" class="hidden absolute inset-0 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center z-10">
-            <div class="animate-spin rounded-full h-7 w-7 border-2 border-cyan-500 border-t-transparent"></div>
+        <!-- STATE B: UNAUTHENTICATED / CONFIG PROMPT VIEW -->
+        <div id="view-unauth-icloud" class="flex-1 flex flex-col items-center justify-center p-6 text-center">
+          <div class="w-16 h-16 rounded-2xl bg-cyan-500/10 text-cyan-400 flex items-center justify-center mb-4 ring-1 ring-cyan-500/20">
+            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
           </div>
-          <table class="w-full text-left text-xs text-slate-300">
-            <thead class="bg-slate-900/90 text-slate-400 uppercase text-[10px] tracking-wider sticky top-0 border-b border-slate-800">
-              <tr>
-                <th class="py-2 px-3">Cartella / File</th>
-                <th class="py-2 px-3 w-24 text-right">Tipo</th>
-              </tr>
-            </thead>
-            <tbody id="file-list-icloud" class="divide-y divide-slate-800/50"></tbody>
-          </table>
-          <div id="empty-icloud" class="hidden p-8 text-center text-slate-500 text-xs">
-            Cartella vuota su iCloud Drive.
-          </div>
+          <h3 class="text-base font-bold text-white mb-1.5">Collega iCloud Drive</h3>
+          <p class="text-xs text-slate-400 max-w-sm mb-6 leading-relaxed">
+            Inserisci il tuo Apple ID e la password specifica per app generata su appleid.apple.com per collegare il WebDAV di iCloud.
+          </p>
+          <button id="btn-login-icloud" class="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-semibold text-xs transition shadow-lg shadow-cyan-900/30">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+            <span>Configura iCloud Drive</span>
+          </button>
         </div>
+
       </section>
 
     </div>
@@ -240,8 +285,10 @@
     <!-- ACTION & CONFIGURATION TOOLBAR -->
     <section class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-xl flex flex-col lg:flex-row items-center justify-between gap-4">
       
-      <!-- Selection Summary & Options -->
+      <!-- Selection Summary & Transfer Mode Toggle -->
       <div class="flex flex-wrap items-center gap-4 text-xs">
+        
+        <!-- Counter Selected -->
         <div class="flex items-center gap-2">
           <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
           <span class="text-slate-200 font-medium">Selezionati:</span>
@@ -251,14 +298,28 @@
 
         <div class="h-4 w-px bg-slate-800 hidden sm:block"></div>
 
+        <!-- TRANSFER MODE SELECTOR: SPOSTA VS COPIA -->
+        <div class="flex items-center gap-1 bg-slate-950/80 p-1 rounded-xl border border-slate-800">
+          <button id="btn-mode-move" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30 transition shadow-sm">
+            <svg class="w-3.5 h-3.5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+            <span>Sposta (Elimina sorgente)</span>
+          </button>
+          <button id="btn-mode-copy" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-slate-200 transition">
+            <svg class="w-3.5 h-3.5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+            <span>Copia (Mantieni sorgente)</span>
+          </button>
+        </div>
+
+        <div class="h-4 w-px bg-slate-800 hidden sm:block"></div>
+
         <!-- Google Docs Export Toggle -->
-        <label class="flex items-center gap-1.5 cursor-pointer select-none text-slate-300" title="Esporta Google Docs in formati Office">
+        <label class="flex items-center gap-1.5 cursor-pointer select-none text-slate-300" title="Esporta Google Docs in formati Office compatibili (.docx, .xlsx, .pptx)">
           <input id="toggle-export-docs" type="checkbox" checked class="rounded bg-slate-800 border-slate-700 text-emerald-500 focus:ring-0">
           <span>Docs Office (.docx)</span>
         </label>
 
-        <!-- Delete Empty Dirs Toggle -->
-        <label class="flex items-center gap-1.5 cursor-pointer select-none text-slate-300" title="Elimina le cartelle sorgente vuote">
+        <!-- Delete Empty Dirs Toggle (only relevant for Move) -->
+        <label id="container-delete-empty" class="flex items-center gap-1.5 cursor-pointer select-none text-slate-300" title="Elimina le cartelle sorgente vuote al termine dello spostamento">
           <input id="toggle-delete-empty" type="checkbox" checked class="rounded bg-slate-800 border-slate-700 text-emerald-500 focus:ring-0">
           <span>Pulisci vuote</span>
         </label>
@@ -268,8 +329,6 @@
           <input id="toggle-dry-run" type="checkbox" class="rounded bg-slate-800 border-slate-700 text-amber-500 focus:ring-0">
           <span>Simulazione (Dry-Run)</span>
         </label>
-
-        <div class="h-4 w-px bg-slate-800 hidden sm:block"></div>
 
         <!-- Bandwidth Limit Select -->
         <div class="flex items-center gap-1.5 text-xs text-slate-400">
@@ -284,11 +343,11 @@
         </div>
       </div>
 
-      <!-- Execute Move Button -->
+      <!-- Execute Transfer Button -->
       <div class="flex items-center gap-3 w-full lg:w-auto">
-        <button id="btn-trigger-move" disabled class="w-full lg:w-auto flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-800 disabled:text-slate-500 text-white font-semibold text-sm transition shadow-lg shadow-emerald-900/30 disabled:shadow-none">
+        <button id="btn-trigger-move" disabled class="w-full lg:w-auto flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 disabled:bg-slate-800 disabled:text-slate-500 text-white font-semibold text-sm transition shadow-lg shadow-amber-900/30 disabled:shadow-none">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
-          Sposta su iCloud Drive
+          <span id="btn-trigger-text">Sposta su iCloud Drive</span>
         </button>
       </div>
     </section>
@@ -400,22 +459,24 @@
   <div id="modal-confirm" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
     <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl flex flex-col gap-4 animate-scale-in">
       <div class="flex items-center gap-3">
-        <div class="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center shrink-0">
+        <div id="modal-confirm-icon-box" class="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center shrink-0">
           <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
         </div>
         <div>
-          <h3 class="text-base font-bold text-white">Conferma Spostamento File</h3>
-          <p class="text-xs text-slate-400">Operazione atomica di spostamento (Move)</p>
+          <h3 id="modal-confirm-title" class="text-base font-bold text-white">Conferma Spostamento File</h3>
+          <p id="modal-action-subtitle" class="text-xs text-slate-400">Operazione atomica di spostamento (Move)</p>
         </div>
       </div>
 
       <div class="text-xs text-slate-300 bg-slate-950/60 p-3 rounded-xl border border-slate-800/80 space-y-2">
-        <p>Stai per spostare <strong id="modal-items-count" class="text-emerald-400">0</strong> elemento/i verso:</p>
+        <p>Stai per trasferire <strong id="modal-items-count" class="text-emerald-400">0</strong> elemento/i verso:</p>
         <p class="font-mono text-cyan-300 break-all text-[11px]" id="modal-target-path">icloud:/</p>
+        
         <div id="modal-dry-run-warning" class="hidden p-2 rounded bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[11px]">
           ⚠️ <strong>MODALITÀ SIMULAZIONE ATTIVA:</strong> I file non verranno cancellati né alterati.
         </div>
-        <p class="text-slate-400 text-[11px] pt-1 border-t border-slate-800">
+        
+        <p id="modal-delete-notice" class="text-slate-400 text-[11px] pt-1 border-t border-slate-800">
           ℹ️ I file sorgente su Google Drive verranno rimossi <strong>esclusivamente dopo</strong> il completamento e la verifica di integrità su iCloud Drive.
         </p>
       </div>
@@ -424,10 +485,142 @@
         <button id="modal-btn-cancel" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition">
           Annulla
         </button>
-        <button id="modal-btn-proceed" class="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition shadow-lg shadow-emerald-900/30">
-          Conferma e Sposta
+        <button id="modal-btn-proceed" class="px-5 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold transition shadow-lg shadow-amber-900/30">
+          Conferma e Procedi
         </button>
       </div>
+    </div>
+  </div>
+
+  <!-- DEDICATED GOOGLE AUTH MODAL (Alternative Login Methods) -->
+  <div id="modal-google-auth" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
+      
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-400 flex items-center justify-center">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M12.24 10.285V14.4h6.806c-.275 1.765-2.056 5.174-6.806 5.174-4.095 0-7.439-3.389-7.439-7.574s3.345-7.574 7.439-7.574c2.33 0 3.891.989 4.785 1.849l3.254-3.138C18.189 1.186 15.479 0 12.24 0c-6.635 0-12 5.365-12 12s5.365 12 12 12c6.926 0 11.52-4.869 11.52-11.726 0-.788-.085-1.39-.189-1.989H12.24z"/></svg>
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-white">Accedi con Google Drive</h3>
+            <p class="text-[11px] text-slate-400">Scegli il metodo di autenticazione preferito</p>
+          </div>
+        </div>
+        <button id="modal-google-auth-close" class="text-slate-400 hover:text-white text-lg">&times;</button>
+      </div>
+
+      <!-- Auth Method Tabs -->
+      <div class="grid grid-cols-3 gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 text-[11px] font-medium">
+        <button id="tab-ga-sa" class="py-1.5 px-2 rounded-lg bg-blue-600 text-white font-semibold transition text-center truncate">
+          1. Service Account
+        </button>
+        <button id="tab-ga-code" class="py-1.5 px-2 rounded-lg text-slate-400 hover:text-white transition text-center truncate">
+          2. Codice OAuth
+        </button>
+        <button id="tab-ga-token" class="py-1.5 px-2 rounded-lg text-slate-400 hover:text-white transition text-center truncate">
+          3. Token Diretto
+        </button>
+      </div>
+
+      <!-- TAB 1: SERVICE ACCOUNT JSON (Most reliable, no redirect needed) -->
+      <div id="content-ga-sa" class="space-y-3 text-xs">
+        <div class="p-3 rounded-xl bg-blue-950/20 border border-blue-500/20 text-slate-300 space-y-1">
+          <p class="font-semibold text-blue-300">💡 Il metodo più comodo e stabile (Consigliato):</p>
+          <p class="text-[11px] text-slate-400 leading-relaxed">
+            Crea una Service Account gratuita su Google Cloud Console, scarica la chiave <code>.json</code> e condividi la tua cartella di Google Drive con l'email del bot. Non richiede redirect e non scade mai.
+          </p>
+        </div>
+
+        <div>
+          <label class="block text-slate-300 font-medium mb-1">File o Contenuto JSON della Service Account:</label>
+          <div class="flex items-center gap-2 mb-2">
+            <label class="cursor-pointer px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-slate-200 text-xs font-medium transition inline-flex items-center gap-1.5">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+              <span>Carica file .json</span>
+              <input type="file" id="input-ga-file" accept=".json" class="hidden">
+            </label>
+            <span id="ga-file-name" class="text-[11px] text-slate-500 truncate">Nessun file selezionato</span>
+          </div>
+          <textarea id="input-ga-sa-json" rows="4" placeholder='Incolla qui il contenuto del file .json (es. {"type": "service_account", "client_email": "...", ...})' class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 font-mono text-[11px] text-slate-200 focus:border-blue-500 focus:outline-none"></textarea>
+        </div>
+
+        <div>
+          <label class="block text-slate-300 font-medium mb-1">ID Cartella Google Drive Condivisa (Opzionale):</label>
+          <input id="input-ga-folder-id" type="text" placeholder="Incolla l'ID o il link completo della cartella (es. 1a2B3c4D...)" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 text-xs font-mono focus:border-blue-500 focus:outline-none">
+          <span class="text-[10px] text-slate-500">Se lasci vuoto, Rclone accederà alla radice dei file visibili alla Service Account.</span>
+        </div>
+
+        <button id="btn-submit-ga-sa" class="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs transition shadow-lg shadow-blue-900/30 flex items-center justify-center gap-2">
+          <span>Connetti con Service Account</span>
+        </button>
+      </div>
+
+      <!-- TAB 2: OAUTH WITH AUTHORIZATION CODE -->
+      <div id="content-ga-code" class="hidden space-y-3 text-xs">
+        <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 space-y-1">
+          <p class="font-semibold text-slate-200">Accesso Guidato tramite Codice Google OAuth:</p>
+          <p class="text-[11px] text-slate-400 leading-relaxed">
+            1. Inserisci il tuo Client ID / Secret (oppure clicca "Usa parametri integrati").<br>
+            2. Apri la pagina Google, autorizza e copia il codice generato.<br>
+            3. Incolla il codice per completare l'accesso.
+          </p>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-slate-400 mb-1">Client ID:</label>
+            <input id="input-ga-code-client-id" type="text" placeholder="ID Client Google Cloud" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 font-mono text-[11px] text-slate-200 focus:border-blue-500 focus:outline-none">
+          </div>
+          <div>
+            <label class="block text-slate-400 mb-1">Client Secret:</label>
+            <input id="input-ga-code-client-secret" type="password" placeholder="Secret Client" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 font-mono text-[11px] text-slate-200 focus:border-blue-500 focus:outline-none">
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <button id="btn-open-google-consent" class="flex-1 py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white font-medium text-xs transition flex items-center justify-center gap-1.5">
+            <svg class="w-3.5 h-3.5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+            <span>1. Apri Pagina Google</span>
+          </button>
+        </div>
+
+        <div>
+          <label class="block text-slate-300 font-medium mb-1">2. Incolla il Codice di Autorizzazione Google:</label>
+          <input id="input-ga-auth-code" type="text" placeholder="Incolla il codice 4/0A... ottenuto da Google" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 font-mono text-xs text-slate-200 focus:border-blue-500 focus:outline-none">
+        </div>
+
+        <button id="btn-submit-ga-code" class="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs transition shadow-lg shadow-blue-900/30">
+          <span>3. Scambia Codice e Accedi</span>
+        </button>
+      </div>
+
+      <!-- TAB 3: DIRECT TOKEN JSON -->
+      <div id="content-ga-token" class="hidden space-y-3 text-xs">
+        <p class="text-slate-400 text-[11px]">
+          Se hai già generato un token OAuth (tramite <code>rclone authorize "drive"</code> o configurazione precedente), puoi incollarlo direttamente:
+        </p>
+        <div>
+          <label class="block text-slate-400 mb-1">Token JSON:</label>
+          <textarea id="input-ga-token-json" rows="4" placeholder='{"access_token":"...","token_type":"Bearer","refresh_token":"...","expiry":"..."}' class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 font-mono text-[11px] text-slate-200 focus:border-blue-500 focus:outline-none"></textarea>
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-slate-400 mb-1">Client ID (Opzionale):</label>
+            <input id="input-ga-token-client-id" type="text" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 font-mono text-[11px] text-slate-200">
+          </div>
+          <div>
+            <label class="block text-slate-400 mb-1">Client Secret (Opzionale):</label>
+            <input id="input-ga-token-client-secret" type="password" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 font-mono text-[11px] text-slate-200">
+          </div>
+        </div>
+        <button id="btn-submit-ga-token" class="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs transition shadow-lg shadow-blue-900/30">
+          <span>Salva Token e Connetti</span>
+        </button>
+      </div>
+
+      <!-- Feedback message in modal -->
+      <div id="ga-status-msg" class="hidden text-xs p-3 rounded-xl"></div>
+
     </div>
   </div>
 
@@ -443,58 +636,39 @@
     </div>
   </div>
 
-  <!-- REMOTE CONFIGURATION WIZARD MODAL -->
+  <!-- ICLOUD / REMOTE CONFIGURATION WIZARD MODAL -->
   <div id="modal-config" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
     <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl flex flex-col gap-5">
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
         <h3 class="text-sm font-bold text-white flex items-center gap-2">
-          <span>⚙️</span> Configurazione Remoti (rclone.conf)
+          <span>☁️</span> Configurazione iCloud Drive (WebDAV)
         </h3>
         <button id="modal-config-close" class="text-slate-400 hover:text-white">&times;</button>
       </div>
 
-      <!-- Config Tabs -->
-      <div class="flex border-b border-slate-800 text-xs font-medium">
-        <button id="tab-btn-gdrive" class="px-4 py-2 text-blue-400 border-b-2 border-blue-500 focus:outline-none">Google Drive</button>
-        <button id="tab-btn-icloud" class="px-4 py-2 text-slate-400 hover:text-slate-200 focus:outline-none">iCloud Drive</button>
-      </div>
-
-      <!-- Tab Content: GDrive -->
-      <div id="tab-content-gdrive" class="space-y-3 text-xs">
-        <div>
-          <label class="block text-slate-400 mb-1">OAuth Token JSON (da `rclone config`):</label>
-          <textarea id="cfg-gdrive-token" rows="3" placeholder='{"access_token":"...","token_type":"Bearer","refresh_token":"...","expiry":"..."}' class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 font-mono text-[11px] text-slate-200 focus:border-blue-500 focus:outline-none"></textarea>
-        </div>
-        <div class="grid grid-cols-2 gap-2">
-          <div>
-            <label class="block text-slate-400 mb-1">Client ID (Opzionale):</label>
-            <input id="cfg-gdrive-client-id" type="text" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 font-mono text-[11px] text-slate-200">
-          </div>
-          <div>
-            <label class="block text-slate-400 mb-1">Client Secret (Opzionale):</label>
-            <input id="cfg-gdrive-client-secret" type="password" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 font-mono text-[11px] text-slate-200">
-          </div>
-        </div>
-        <div class="flex items-center justify-between pt-2">
-          <button id="btn-test-gdrive" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs transition border border-slate-700">Test Connessione</button>
-          <button id="btn-save-gdrive" class="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold transition">Salva gdrive</button>
-        </div>
-      </div>
-
       <!-- Tab Content: iCloud -->
-      <div id="tab-content-icloud" class="hidden space-y-3 text-xs">
+      <div class="space-y-3 text-xs">
+        <div class="p-3 rounded-xl bg-cyan-950/20 border border-cyan-500/20 text-slate-300 space-y-1">
+          <p class="font-semibold text-cyan-300">Come configurare iCloud Drive:</p>
+          <p class="text-[11px] text-slate-400 leading-relaxed">
+            1. Vai su <a href="https://appleid.apple.com" target="_blank" class="text-cyan-400 underline">appleid.apple.com</a> e accedi al tuo ID Apple.<br>
+            2. Nella sezione <em>Password specifiche per le app</em>, generane una (es. "cloudsync").<br>
+            3. Inserisci la tua email e la password specifica per app qui sotto.
+          </p>
+        </div>
+
         <div>
-          <label class="block text-slate-400 mb-1">ID Apple (email):</label>
-          <input id="cfg-icloud-user" type="email" placeholder="tuousername@icloud.com" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-slate-200 focus:border-cyan-500 focus:outline-none">
+          <label class="block text-slate-300 mb-1 font-medium">ID Apple (email):</label>
+          <input id="cfg-icloud-user" type="email" placeholder="tuousername@icloud.com" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 focus:border-cyan-500 focus:outline-none">
         </div>
         <div>
-          <label class="block text-slate-400 mb-1">Password specifica per l'app Apple:</label>
-          <input id="cfg-icloud-pass" type="password" placeholder="abcd-efgh-ijkl-mnop" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 font-mono text-slate-200 focus:border-cyan-500 focus:outline-none">
+          <label class="block text-slate-300 mb-1 font-medium">Password specifica per l'app Apple:</label>
+          <input id="cfg-icloud-pass" type="password" placeholder="abcd-efgh-ijkl-mnop" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 font-mono text-slate-200 focus:border-cyan-500 focus:outline-none">
           <span class="text-[10px] text-slate-500">Verrà automaticamente oscurata e protetta da Rclone.</span>
         </div>
         <div class="flex items-center justify-between pt-2">
-          <button id="btn-test-icloud" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs transition border border-slate-700">Test Connessione</button>
-          <button id="btn-save-icloud" class="px-4 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold transition">Salva icloud</button>
+          <button id="btn-test-icloud" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs transition border border-slate-700">Test Connessione</button>
+          <button id="btn-save-icloud" class="px-5 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold transition shadow-lg shadow-cyan-900/30">Salva iCloud</button>
         </div>
       </div>
 

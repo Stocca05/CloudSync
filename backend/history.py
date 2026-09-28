@@ -32,6 +32,8 @@ class HistoryEntry(BaseModel):
 
     id: str
     timestamp: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
+    action: str = "move"  # move or copy
+    delete_source: bool = True
     src_remote: str = "gdrive"
     dst_remote: str = "icloud"
     dst_path: str = ""

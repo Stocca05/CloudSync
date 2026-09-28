@@ -218,6 +218,75 @@ class RcloneClient:
             raise RcloneAPIError("Failed to obtain jobid from sync/move", details=res)
         return int(job_id)
 
+    async def copy_file(
+        self,
+        src_remote: str,
+        src_path: str,
+        dst_remote: str,
+        dst_path: str,
+        dry_run: bool = False,
+    ) -> int:
+        """Copy a single file from source remote to destination remote asynchronously.
+
+        Returns the background Rclone job ID.
+        """
+        src_fs = f"{src_remote.rstrip(':')}:"
+        dst_fs = f"{dst_remote.rstrip(':')}:"
+        payload: dict[str, Any] = {
+            "srcFs": src_fs,
+            "srcRemote": src_path.lstrip("/"),
+            "dstFs": dst_fs,
+            "dstRemote": dst_path.lstrip("/"),
+            "_async": True,
+        }
+        if dry_run:
+            payload["_config"] = {"DryRun": True}
+
+        res = await self._post("operations/copyfile", payload)
+        job_id = res.get("jobid")
+        if job_id is None:
+            raise RcloneAPIError(
+                "Failed to obtain jobid from operations/copyfile", details=res
+            )
+        return int(job_id)
+
+    async def copy_directory(
+        self,
+        src_remote: str,
+        src_path: str,
+        dst_remote: str,
+        dst_path: str,
+        export_formats: str | None = None,
+        dry_run: bool = False,
+    ) -> int:
+        """Copy an entire directory tree from source to destination asynchronously without deleting source.
+
+        Returns the background Rclone job ID.
+        """
+        src_clean = src_path.strip("/")
+        dst_clean = dst_path.strip("/")
+        src_fs = f"{src_remote.rstrip(':')}:{src_clean}"
+        dst_fs = f"{dst_remote.rstrip(':')}:{dst_clean}"
+
+        config_dict: dict[str, Any] = {
+            "DriveExportFormats": export_formats or settings.drive_export_formats,
+        }
+        if dry_run:
+            config_dict["DryRun"] = True
+
+        payload: dict[str, Any] = {
+            "srcFs": src_fs,
+            "dstFs": dst_fs,
+            "createEmptySrcDirs": True,
+            "_async": True,
+            "_config": config_dict,
+        }
+        res = await self._post("sync/copy", payload)
+        job_id = res.get("jobid")
+        if job_id is None:
+            raise RcloneAPIError("Failed to obtain jobid from sync/copy", details=res)
+        return int(job_id)
+
     async def set_bwlimit(self, rate: str = "off") -> dict[str, Any]:
         """Throttle transfer speed dynamically (e.g. '10M', '2M', 'off')."""
         return await self._post("core/bwlimit", {"rate": rate})
@@ -237,6 +306,10 @@ class RcloneClient:
             "opt": {"obscure": obscure},
         }
         return await self._post("config/create", payload)
+
+    async def config_delete(self, name: str) -> dict[str, Any]:
+        """Delete a remote from rclone.conf."""
+        return await self._post("config/delete", {"name": name})
 
     async def config_get(self, name: str) -> dict[str, Any]:
         """Retrieve configuration parameters for a remote."""

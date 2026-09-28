@@ -88,60 +88,63 @@ flowchart TD
 
 ---
 
-## 🚀 Modalità Dimostrativa Istantanea (Demo Mode)
+## 🔄 Scelta Modalità: Sposta vs Copia
 
-Vuoi provare l'applicazione prima di configurare i tuoi account personali?
-1. Avvia l'applicazione con `./start.sh` (o `start.command` / `start.bat`).
-2. Nella barra superiore clicca su **"Attiva Modalità Demo"**.
-3. Verranno generati automaticamente file di test realistici (PDF, fogli Excel, documenti `.gdoc`, foto) e configurati remoti virtuali locali.
-4. Potrai selezionare file, spostarli, verificare l'eliminazione dalla sorgente, testare la barra di avanzamento e i grafici di velocità senza inserire alcuna credenziale!
+Nella barra strumenti dell'applicazione puoi scegliere in ogni momento la modalità operativa desiderata prima di avviare il trasferimento:
+
+1. **Sposta (Elimina sorgente):**
+   - Sposta i file selezionati su iCloud Drive ed **elimina i file originali da Google Drive** solo a trasferimento completato e verificato con successo.
+   - Pulisce automaticamente anche le cartelle sorgente rimaste vuote.
+2. **Copia (Mantieni sorgente):**
+   - Duplica i file e le cartelle selezionate su iCloud Drive **mantenendo intatti tutti i file originali su Google Drive**.
+   - Nessun file sorgente viene cancellato.
 
 ---
 
-## ⚙️ Configurazione dei Remoti Reali (`rclone.conf`)
+## 🔑 Accesso e Connessione con Account Google
 
-Puoi configurare i remoti reali sia **dalla Web UI** (pulsante `Configura` in alto a destra) sia modificando il file `config/rclone.conf`:
+Non ci sono file inventati o mock all'avvio: l'applicazione all'apertura mostra chiaramente lo stato di connessione e invita ad accedere con il proprio account Google.
 
-```bash
-cp config/rclone.conf.example config/rclone.conf
-```
+Cliccando sul pulsante **"Accedi con Google"** (nella colonna sorgente o nella barra di navigazione) puoi scegliere tra diversi metodi di connessione:
 
-### 1. Configurazione Google Drive (`[gdrive]`)
-```ini
-[gdrive]
-type = drive
-scope = drive
-client_id = TUO_CLIENT_ID.apps.googleusercontent.com
-client_secret = TUO_CLIENT_SECRET
-token = {"access_token":"...","token_type":"Bearer","refresh_token":"...","expiry":"2026-10-01T00:00:00Z"}
-```
+### Metodo 1: Service Account Google Cloud (JSON) — *Consigliato*
+- **Perché è ideale:** Non richiede server web locali, non soffre di problemi di redirect del browser su porte locali, e **non scade mai**.
+- **Come si usa:**
+  1. Crea una Service Account gratuita su Google Cloud Console e scarica la chiave `.json`.
+  2. Condividi la cartella di Google Drive desiderata con l'indirizzo email della Service Account (es. `bot@tuo-progetto.iam.gserviceaccount.com`).
+  3. Nella Web UI di CloudSync, clicca **"Carica file .json"** (oppure incolla il testo JSON) e premi **"Connetti con Service Account"**.
 
-### 2. Configurazione iCloud Drive (`[icloud]`)
-1. Vai su [appleid.apple.com](https://appleid.apple.com/account/manage) e genera una **Password specifica per le app**.
-2. Oscura la password tramite l'interfaccia dell'app (sezione *Configura*) oppure da terminale:
-   ```bash
-   rclone obscure "tua-password-specifica"
-   ```
-3. Compila il file:
-   ```ini
-   [icloud]
-   type = webdav
-   url = https://p58-content.icloud.com
-   vendor = other
-   user = tuaemail@icloud.com
-   pass = PasswordOscurata
-   ```
+### Metodo 2: Codice di Autorizzazione Google OAuth
+- **Come si usa:**
+  1. Inserisci il tuo Client ID (e opzionalmente Client Secret).
+  2. Clicca su **"1. Apri Pagina Google"**: verrai indirizzato alla schermata ufficiale di consenso Google Drive.
+  3. Autorizza l'applicazione e copia il codice di autorizzazione generato.
+  4. Incolla il codice nel campo e premi **"3. Scambia Codice e Accedi"**. Il backend contatta Google, scambia il codice con i token e registra Google Drive in Rclone.
+
+### Metodo 3: Token OAuth JSON Diretto
+- Se disponi già di un token OAuth (generato tramite `rclone authorize "drive"` o sessioni precedenti), puoi incollare il blocco JSON (`{"access_token":"...","refresh_token":"..."}`) nel tab *Token Diretto*.
+
+---
+
+## ☁️ Configurazione iCloud Drive (Destinazione)
+
+1. Vai su [appleid.apple.com](https://appleid.apple.com/account/manage) e genera una **Password specifica per le app** (es. "cloudsync").
+2. Nell'interfaccia di CloudSync, clicca sul pulsante **"Configura iCloud Drive"**.
+3. Inserisci la tua email Apple ID e la password specifica per app appena generata.
+4. Clicca su **"Salva iCloud"**: la password verrà automaticamente oscurata e protetta da Rclone.
 
 ---
 
 ## 🖥️ Funzionalità Principali della Web UI
 
+- **Scelta Sposta / Copia:** Toggle dinamico per decidere se eliminare o preservare i dati originali su Google Drive.
 - **Esplora File a 2 Colonne:** Navigazione ad albero con breadcrumb per Google Drive (sorgente) e iCloud Drive (destinazione).
+- **Zero File Fittizi:** Se un provider non è configurato, mostra la schermata di login pulita per collegarsi all'istante.
 - **Esportazione Automatica Google Docs:** Riconoscimento intelligente dei formati proprietari di Google (`.gdoc`, `.gsheet`, `.gslides`) ed esportazione automatica nei rispettivi standard Microsoft Office (`.docx`, `.xlsx`, `.pptx`).
-- **Modalità Simulazione (Dry Run):** Possibilità di simulare l'intero trasferimento per verificare i percorsi e le autorizzazioni senza cancellare o alterare i dati reali.
-- **Controllo di Banda Dinamico:** Selettore di velocità per limitare l'impatto sulla connessione internet (Illimitata, 50 MB/s, 15 MB/s, 5 MB/s, 1 MB/s).
-- **Dashboard Real-Time:** Velocità in MB/s, percentuale di completamento, tempo trascorso, ETA stimato e tabella dei file attualmente in transito.
-- **Storico Trasferimenti Persistente:** Registro cronologico consultabile in qualsiasi momento dei batch eseguiti.
+- **Modalità Simulazione (Dry Run):** Possibilità di simulare il trasferimento per verificare i percorsi e le autorizzazioni senza alterare i dati.
+- **Controllo di Banda Dinamico:** Selettore di velocità (Illimitata, 50 MB/s, 15 MB/s, 5 MB/s, 1 MB/s).
+- **Dashboard Real-Time:** Velocità in MB/s, percentuale di avanzamento, tempo trascorso, ETA stimato e tabella dei file in transito.
+- **Storico Trasferimenti Persistente:** Registro cronologico consultabile in qualsiasi momento dei batch eseguiti con indicazione se si è trattato di spostamento o copia.
 
 ---
 
