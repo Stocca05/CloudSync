@@ -1,0 +1,33 @@
+# ==============================================================================
+# CloudSync - Docker Compose Configuration
+# Orchestrates the containerized Google Drive to iCloud Drive file mover
+# ==============================================================================
+
+services:
+  cloudsync:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: cloudsync:latest
+    container_name: cloudsync
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - RCLONE_CONFIG=/app/config/rclone.conf
+      - RCLONE_RC_ADDR=127.0.0.1:5572
+      - RCLONE_LOG_LEVEL=INFO
+      - RCLONE_DRIVE_EXPORT_FORMATS=docx,xlsx,pptx,pdf
+      - PYTHONUNBUFFERED=1
+    volumes:
+      # Volume di configurazione montato in lettura/scrittura (rw)
+      # FONDAMENTALE: Rclone deve poter aggiornare i token OAuth2 (Google Drive) in rclone.conf
+      - ./config:/app/config:rw
+      # Volume persistente per log e cache temporanea
+      - ./data:/app/data:rw
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/api/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

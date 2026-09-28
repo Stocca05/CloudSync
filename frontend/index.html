@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="it" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CloudSync | Google Drive to iCloud Drive</title>
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0fdf4',
+              500: '#22c55e',
+              600: '#16a34a',
+              700: '#15803d',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans antialiased selection:bg-emerald-500 selection:text-white">
+
+  <!-- TOP HEADER -->
+  <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      
+      <!-- Brand & Privacy Indicator -->
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-cyan-600 flex items-center justify-center shadow-lg shadow-emerald-500/20 text-white font-bold text-xl">
+          ☁️
+        </div>
+        <div>
+          <div class="flex items-center space-x-2">
+            <h1 class="text-lg font-bold tracking-tight text-white">CloudSync</h1>
+            <span class="text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              RAM-Piping Privato
+            </span>
+          </div>
+          <p class="text-xs text-slate-400">Trasferimento diretto Google Drive ➔ iCloud Drive</p>
+        </div>
+      </div>
+
+      <!-- Remote Statuses & Connection Indicator -->
+      <div class="flex items-center space-x-4">
+        <!-- Google Drive Status Pill -->
+        <div id="status-gdrive" class="flex items-center gap-2 bg-slate-800/80 border border-slate-700/60 px-3 py-1.5 rounded-lg text-xs">
+          <span class="w-2 h-2 rounded-full bg-amber-400" id="dot-gdrive"></span>
+          <span class="font-medium text-slate-300">gdrive:</span>
+          <span class="text-slate-400 text-[11px]" id="info-gdrive">Verifica...</span>
+        </div>
+
+        <!-- iCloud Drive Status Pill -->
+        <div id="status-icloud" class="flex items-center gap-2 bg-slate-800/80 border border-slate-700/60 px-3 py-1.5 rounded-lg text-xs">
+          <span class="w-2 h-2 rounded-full bg-amber-400" id="dot-icloud"></span>
+          <span class="font-medium text-slate-300">icloud:</span>
+          <span class="text-slate-400 text-[11px]" id="info-icloud">Verifica...</span>
+        </div>
+
+        <!-- Refresh Remotes Button -->
+        <button id="btn-refresh-remotes" title="Ricarica stato remoti" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 transition">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+        </button>
+
+        <!-- Live Connection Mode Badge -->
+        <div class="hidden sm:flex items-center gap-1.5 text-xs text-slate-400 bg-slate-800/50 px-2.5 py-1 rounded-md border border-slate-700/40">
+          <span id="ws-indicator" class="w-2 h-2 rounded-full bg-slate-500"></span>
+          <span id="ws-status-text">Connessione...</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- NOTIFICATION BANNER / WARNING FOR MISSING REMOTES -->
+  <div id="remotes-warning" class="hidden bg-amber-950/40 border-b border-amber-600/30 px-4 py-2.5 text-xs text-amber-200">
+    <div class="max-w-7xl mx-auto flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <svg class="w-4 h-4 text-amber-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+        <span id="remotes-warning-text">Configurazione <code>rclone.conf</code> incompleta. Assicurati che siano definiti i remoti <strong>gdrive</strong> e <strong>icloud</strong>.</span>
+      </div>
+      <span class="text-[11px] text-amber-400/80">Vedi config/rclone.conf.example</span>
+    </div>
+  </div>
+
+  <!-- MAIN CONTAINER -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 flex flex-col gap-6">
+
+    <!-- DUAL COLUMN EXPLORER -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+
+      <!-- LEFT COLUMN: SORGENTE GOOGLE DRIVE -->
+      <section class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl flex flex-col h-[560px]">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+          <div class="flex items-center gap-2">
+            <div class="p-1.5 bg-blue-500/10 text-blue-400 rounded-lg">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
+            </div>
+            <div>
+              <h2 class="text-sm font-semibold text-white flex items-center gap-1.5">
+                Google Drive (Sorgente)
+                <span class="text-[10px] bg-blue-500/20 text-blue-300 px-1.5 py-0.2 rounded font-mono">gdrive:</span>
+              </h2>
+              <p class="text-xs text-slate-400">Seleziona file o cartelle da spostare</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <button id="btn-select-all-gdrive" class="text-xs text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 px-2.5 py-1 rounded-md transition">
+              Seleziona tutto
+            </button>
+            <button id="btn-refresh-gdrive" title="Aggiorna" class="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-md transition">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Breadcrumbs & Search -->
+        <div class="py-2.5 flex items-center justify-between gap-3 text-xs">
+          <div id="breadcrumbs-gdrive" class="flex items-center gap-1 overflow-x-auto text-slate-400 py-1 font-mono text-[11px] scrollbar-thin">
+            <!-- Populated via JS -->
+          </div>
+          <div class="relative w-44 shrink-0">
+            <input id="search-gdrive" type="text" placeholder="Filtra file..." class="w-full bg-slate-800/80 border border-slate-700 rounded-md px-2.5 py-1 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500">
+          </div>
+        </div>
+
+        <!-- File List / Table -->
+        <div class="flex-1 overflow-y-auto border border-slate-800/80 rounded-xl bg-slate-950/40 relative">
+          <div id="loading-gdrive" class="hidden absolute inset-0 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center z-10">
+            <div class="animate-spin rounded-full h-7 w-7 border-2 border-blue-500 border-t-transparent"></div>
+          </div>
+          <table class="w-full text-left text-xs text-slate-300">
+            <thead class="bg-slate-900/90 text-slate-400 uppercase text-[10px] tracking-wider sticky top-0 border-b border-slate-800">
+              <tr>
+                <th class="py-2 px-3 w-8 text-center">
+                  <input id="checkbox-master-gdrive" type="checkbox" class="rounded bg-slate-800 border-slate-700 text-blue-500 focus:ring-0">
+                </th>
+                <th class="py-2 px-2">Nome</th>
+                <th class="py-2 px-3 w-20 text-right">Dimensione</th>
+              </tr>
+            </thead>
+            <tbody id="file-list-gdrive" class="divide-y divide-slate-800/50">
+              <!-- Dynamically populated via app.js -->
+            </tbody>
+          </table>
+          <div id="empty-gdrive" class="hidden p-8 text-center text-slate-500 text-xs">
+            Nessun elemento trovato in questa cartella.
+          </div>
+        </div>
+      </section>
+
+      <!-- RIGHT COLUMN: DESTINAZIONE ICLOUD DRIVE -->
+      <section class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl flex flex-col h-[560px]">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+          <div class="flex items-center gap-2">
+            <div class="p-1.5 bg-cyan-500/10 text-cyan-400 rounded-lg">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+            </div>
+            <div>
+              <h2 class="text-sm font-semibold text-white flex items-center gap-1.5">
+                iCloud Drive (Destinazione)
+                <span class="text-[10px] bg-cyan-500/20 text-cyan-300 px-1.5 py-0.2 rounded font-mono">icloud:</span>
+              </h2>
+              <p class="text-xs text-slate-400">Naviga e seleziona la cartella di arrivo</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <button id="btn-new-folder-icloud" class="flex items-center gap-1 text-xs text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 px-2.5 py-1 rounded-md transition">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+              Nuova cartella
+            </button>
+            <button id="btn-refresh-icloud" title="Aggiorna" class="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-md transition">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Breadcrumbs & Current Target Indicator -->
+        <div class="py-2.5 flex items-center justify-between gap-3 text-xs">
+          <div id="breadcrumbs-icloud" class="flex items-center gap-1 overflow-x-auto text-slate-400 py-1 font-mono text-[11px] scrollbar-thin">
+            <!-- Populated via JS -->
+          </div>
+          <div class="text-[11px] text-cyan-300 bg-cyan-500/10 border border-cyan-500/20 px-2 py-0.5 rounded truncate max-w-[200px]" id="target-summary">
+            Destinazione: /
+          </div>
+        </div>
+
+        <!-- iCloud Directory Tree List -->
+        <div class="flex-1 overflow-y-auto border border-slate-800/80 rounded-xl bg-slate-950/40 relative">
+          <div id="loading-icloud" class="hidden absolute inset-0 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center z-10">
+            <div class="animate-spin rounded-full h-7 w-7 border-2 border-cyan-500 border-t-transparent"></div>
+          </div>
+          <table class="w-full text-left text-xs text-slate-300">
+            <thead class="bg-slate-900/90 text-slate-400 uppercase text-[10px] tracking-wider sticky top-0 border-b border-slate-800">
+              <tr>
+                <th class="py-2 px-3">Cartella / File</th>
+                <th class="py-2 px-3 w-24 text-right">Tipo</th>
+              </tr>
+            </thead>
+            <tbody id="file-list-icloud" class="divide-y divide-slate-800/50">
+              <!-- Dynamically populated via app.js -->
+            </tbody>
+          </table>
+          <div id="empty-icloud" class="hidden p-8 text-center text-slate-500 text-xs">
+            Cartella vuota su iCloud Drive.
+          </div>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- ACTION & CONFIGURATION TOOLBAR -->
+    <section class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-xl flex flex-col md:flex-row items-center justify-between gap-4">
+      
+      <!-- Selection Summary & Options -->
+      <div class="flex flex-col sm:flex-row items-start sm:items-center gap-4 text-xs">
+        <div class="flex items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+          <span class="text-slate-200 font-medium">Elementi selezionati:</span>
+          <span id="selected-count-badge" class="bg-slate-800 text-emerald-400 px-2 py-0.5 rounded-md font-mono font-semibold">0 elementi</span>
+          <span id="selected-size-badge" class="text-slate-400 text-[11px]">(0 B)</span>
+        </div>
+
+        <div class="h-4 w-px bg-slate-800 hidden sm:block"></div>
+
+        <div class="flex items-center gap-4">
+          <!-- Google Docs Export Toggle -->
+          <label class="flex items-center gap-2 cursor-pointer select-none" title="I documenti di Google verranno esportati automaticamente in .docx, .xlsx, .pptx">
+            <input id="toggle-export-docs" type="checkbox" checked class="rounded bg-slate-800 border-slate-700 text-emerald-500 focus:ring-0">
+            <span class="text-slate-300">Esporta Google Docs (.docx, .xlsx)</span>
+          </label>
+
+          <!-- Delete Empty Dirs Toggle -->
+          <label class="flex items-center gap-2 cursor-pointer select-none" title="Elimina le cartelle sorgente vuote su Google Drive al termine del trasferimento">
+            <input id="toggle-delete-empty" type="checkbox" checked class="rounded bg-slate-800 border-slate-700 text-emerald-500 focus:ring-0">
+            <span class="text-slate-300">Pulisci cartelle vuote</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Execute Move Button -->
+      <div class="flex items-center gap-3 w-full md:w-auto">
+        <button id="btn-trigger-move" disabled class="w-full md:w-auto flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-800 disabled:text-slate-500 text-white font-semibold text-sm transition shadow-lg shadow-emerald-900/30 disabled:shadow-none">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+          Sposta su iCloud Drive
+        </button>
+      </div>
+    </section>
+
+    <!-- REAL-TIME TRANSFER MONITORING DASHBOARD -->
+    <section class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl flex flex-col gap-4">
+      <div class="flex items-center justify-between pb-2 border-b border-slate-800">
+        <div class="flex items-center gap-2">
+          <div class="p-1.5 bg-emerald-500/10 text-emerald-400 rounded-lg">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+          </div>
+          <div>
+            <h2 class="text-sm font-semibold text-white">Monitoraggio Trasferimento (Real-Time)</h2>
+            <p class="text-xs text-slate-400">Metriche via Rclone RC (In-RAM Piping ad alta velocità)</p>
+          </div>
+        </div>
+
+        <!-- Active Jobs Counter -->
+        <div class="flex items-center gap-2 text-xs">
+          <span class="text-slate-400">Job attivi:</span>
+          <span id="active-jobs-badge" class="bg-slate-800 text-emerald-400 px-2 py-0.5 rounded-full font-mono font-bold">0</span>
+        </div>
+      </div>
+
+      <!-- Key Performance Metrics Grid -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <!-- Metric 1: Transfer Speed -->
+        <div class="bg-slate-950/60 border border-slate-800/80 rounded-xl p-3">
+          <span class="text-[11px] text-slate-400 uppercase font-medium">Velocità di Trasferimento</span>
+          <div class="mt-1 flex items-baseline gap-1">
+            <span id="metric-speed" class="text-xl font-bold font-mono text-white">0.0</span>
+            <span class="text-xs text-emerald-400 font-medium">MB/s</span>
+          </div>
+        </div>
+
+        <!-- Metric 2: Bytes Transferred -->
+        <div class="bg-slate-950/60 border border-slate-800/80 rounded-xl p-3">
+          <span class="text-[11px] text-slate-400 uppercase font-medium">Dati Trasferiti</span>
+          <div class="mt-1 flex items-baseline gap-1">
+            <span id="metric-bytes" class="text-xl font-bold font-mono text-white">0 B</span>
+            <span id="metric-total-bytes" class="text-xs text-slate-500 font-mono">/ 0 B</span>
+          </div>
+        </div>
+
+        <!-- Metric 3: Transfers Count -->
+        <div class="bg-slate-950/60 border border-slate-800/80 rounded-xl p-3">
+          <span class="text-[11px] text-slate-400 uppercase font-medium">File Completati</span>
+          <div class="mt-1 flex items-baseline gap-1">
+            <span id="metric-transfers" class="text-xl font-bold font-mono text-white">0</span>
+            <span id="metric-total-transfers" class="text-xs text-slate-500 font-mono">/ 0</span>
+          </div>
+        </div>
+
+        <!-- Metric 4: Elapsed Time & ETA -->
+        <div class="bg-slate-950/60 border border-slate-800/80 rounded-xl p-3">
+          <span class="text-[11px] text-slate-400 uppercase font-medium">Tempo & ETA</span>
+          <div class="mt-1 flex items-baseline gap-1">
+            <span id="metric-time" class="text-xl font-bold font-mono text-white">00:00</span>
+            <span id="metric-eta" class="text-xs text-slate-400 font-mono">(ETA: --)</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Overall Progress Bar -->
+      <div class="space-y-1.5">
+        <div class="flex items-center justify-between text-xs text-slate-300">
+          <span>Avanzamento Globale</span>
+          <span id="global-progress-percent" class="font-mono font-bold text-emerald-400">0%</span>
+        </div>
+        <div class="w-full bg-slate-800 rounded-full h-2.5 overflow-hidden">
+          <div id="global-progress-bar" class="bg-emerald-500 h-2.5 rounded-full transition-all duration-300 w-0"></div>
+        </div>
+      </div>
+
+      <!-- Active In-Flight Files Table -->
+      <div class="border border-slate-800 rounded-xl overflow-hidden bg-slate-950/40">
+        <div class="px-3 py-2 bg-slate-800/40 border-b border-slate-800 text-xs font-semibold text-slate-300 flex items-center justify-between">
+          <span>File attualmente in transito</span>
+          <span id="in-flight-count" class="text-slate-400 text-[11px]">0 file</span>
+        </div>
+        <div class="max-h-40 overflow-y-auto divide-y divide-slate-800/60" id="transferring-files-list">
+          <div class="p-4 text-center text-xs text-slate-500 italic">
+            Nessun file attualmente in transito.
+          </div>
+        </div>
+      </div>
+
+      <!-- Console / Activity Log -->
+      <div class="border border-slate-800 rounded-xl overflow-hidden bg-slate-950/80">
+        <div class="px-3 py-2 bg-slate-900 border-b border-slate-800 flex items-center justify-between text-xs">
+          <div class="flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-slate-500"></span>
+            <span class="font-mono text-slate-400 font-semibold">Registro Eventi & Log</span>
+          </div>
+          <button id="btn-clear-logs" class="text-[11px] text-slate-500 hover:text-slate-300 transition">
+            Pulisci log
+          </button>
+        </div>
+        <div id="logs-console" class="p-3 font-mono text-[11px] text-slate-400 h-32 overflow-y-auto space-y-1">
+          <div><span class="text-slate-600">[00:00:00]</span> Benvenuto in CloudSync. Inizializzazione completata.</div>
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- CONFIRMATION MODAL -->
+  <div id="modal-confirm" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl flex flex-col gap-4 animate-scale-in">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center shrink-0">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+        </div>
+        <div>
+          <h3 class="text-base font-bold text-white">Conferma Spostamento File</h3>
+          <p class="text-xs text-slate-400">Operazione atomica di spostamento (Move)</p>
+        </div>
+      </div>
+
+      <div class="text-xs text-slate-300 bg-slate-950/60 p-3 rounded-xl border border-slate-800/80 space-y-2">
+        <p>Stai per spostare <strong id="modal-items-count" class="text-emerald-400">0</strong> elemento/i verso:</p>
+        <p class="font-mono text-cyan-300 break-all text-[11px]" id="modal-target-path">icloud:/</p>
+        <p class="text-slate-400 text-[11px] pt-1 border-t border-slate-800">
+          ℹ️ I file sorgente su Google Drive verranno rimossi <strong>esclusivamente dopo</strong> il completamento e la verifica di integrità su iCloud Drive.
+        </p>
+      </div>
+
+      <div class="flex items-center justify-end gap-3 pt-2">
+        <button id="modal-btn-cancel" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition">
+          Annulla
+        </button>
+        <button id="modal-btn-proceed" class="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition shadow-lg shadow-emerald-900/30">
+          Conferma e Sposta
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- NEW FOLDER MODAL -->
+  <div id="modal-mkdir" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-sm w-full p-5 shadow-2xl flex flex-col gap-4">
+      <h3 class="text-sm font-bold text-white">Crea nuova cartella su iCloud</h3>
+      <input id="input-mkdir-name" type="text" placeholder="Nome cartella (es. Documenti)" class="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500">
+      <div class="flex items-center justify-end gap-2">
+        <button id="modal-mkdir-cancel" class="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 text-xs hover:bg-slate-700 transition">Annulla</button>
+        <button id="modal-mkdir-confirm" class="px-4 py-1.5 rounded-lg bg-cyan-600 text-white text-xs font-medium hover:bg-cyan-500 transition">Crea</button>
+      </div>
+    </div>
+  </div>
+
+  <footer class="border-t border-slate-800/80 py-4 text-center text-xs text-slate-500">
+    CloudSync • Motore Rclone v1.75+ • Nessun dato salvato su server terzi • 100% Locale
+  </footer>
+
+  <script src="/app.js"></script>
+</body>
+</html>
