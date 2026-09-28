@@ -1,0 +1,55 @@
+# Environment & Secrets
+.env
+.env*.local
+*.env
+*.pem
+*.key
+
+# Operating System
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.venv/
+venv/
+ENV/
+.ruff_cache/
+.pytest_cache/
+
+# Node.js
+node_modules/
+.next/
+out/
+
+# IDE & Editors
+.vscode/
+.idea/
+*.swp
+*.swo
