@@ -1425,6 +1425,23 @@ function setupEventListeners() {
     .getElementById("btn-cancel-ga-interactive")
     ?.addEventListener("click", closeGoogleInteractiveModal);
 
+  const inputRemoteUrl = document.getElementById("input-ga-remote-url");
+  inputRemoteUrl?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      submitGoogleInteractiveCallback();
+    }
+  });
+  inputRemoteUrl?.addEventListener("paste", () => {
+    setTimeout(() => {
+      if (
+        inputRemoteUrl.value.includes("code=") ||
+        inputRemoteUrl.value.includes("state=")
+      ) {
+        submitGoogleInteractiveCallback();
+      }
+    }, 100);
+  });
+
   // Unified Config Modal Events
   document
     .getElementById("modal-config-close")

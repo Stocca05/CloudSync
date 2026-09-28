@@ -9,6 +9,7 @@ import json
 import logging
 import os
 import re
+import urllib.parse
 import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -86,6 +87,7 @@ class GoogleInteractiveAuth:
         self.error: str | None = None
         self.token: dict[str, Any] | None = None
         self._task: asyncio.Task | None = None
+        self._proxy_server: asyncio.Server | None = None
 
     async def start(self) -> dict[str, Any]:
         """Launch rclone authorize drive in the background and capture Google consent URL."""
@@ -105,6 +107,7 @@ class GoogleInteractiveAuth:
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
+            await self._start_tcp_proxy()
         except Exception as exc:
             self.status = "failed"
             self.error = f"Impossibile avviare il processo di autorizzazione: {exc}"
@@ -193,11 +196,55 @@ class GoogleInteractiveAuth:
             self.status = "failed"
             self.error = str(exc)
 
+    async def _start_tcp_proxy(self):
+        """Bridge container's 0.0.0.0:53683 to 127.0.0.1:53682 so Docker port forwarding from host 53682 reaches Rclone."""
+
+        async def pipe(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
+            try:
+                while not reader.at_eof():
+                    data = await reader.read(4096)
+                    if not data:
+                        break
+                    writer.write(data)
+                    await writer.drain()
+            except Exception as exc:  # noqa: BLE001
+                logger.debug("Pipe transfer ended: %s", exc)
+            finally:
+                try:
+                    writer.close()
+                    await writer.wait_closed()
+                except Exception as exc:  # noqa: BLE001
+                    logger.debug("Pipe writer close error: %s", exc)
+
+        async def handle_client(
+            local_reader: asyncio.StreamReader, local_writer: asyncio.StreamWriter
+        ):
+            try:
+                remote_reader, remote_writer = await asyncio.open_connection(
+                    "127.0.0.1", 53682
+                )
+                asyncio.create_task(pipe(local_reader, remote_writer))
+                asyncio.create_task(pipe(remote_reader, local_writer))
+            except Exception as exc:  # noqa: BLE001
+                logger.debug("Proxy connection error: %s", exc)
+                try:
+                    local_writer.close()
+                except Exception as close_exc:  # noqa: BLE001
+                    logger.debug("Local writer close error: %s", close_exc)
+
+        try:
+            self._proxy_server = await asyncio.start_server(
+                handle_client, "0.0.0.0", 53683
+            )
+            logger.info("TCP OAuth proxy listening on 0.0.0.0:53683 -> 127.0.0.1:53682")
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Could not start TCP OAuth proxy on 53683: %s", exc)
+
     async def forward_callback(
         self, code_or_url: str, state: str | None = None
     ) -> bool:
         """Forward callback code or full redirected URL to internal listener."""
-        input_str = code_or_url.strip()
+        input_str = code_or_url.strip().strip("'\"")
         code = input_str
         st = state or self.state or ""
 
@@ -205,25 +252,34 @@ class GoogleInteractiveAuth:
         if "code=" in input_str:
             code_match = re.search(r"[?&]code=([^&]+)", input_str)
             if code_match:
-                code = code_match.group(1)
+                code = urllib.parse.unquote(code_match.group(1))
         if "state=" in input_str:
             state_match = re.search(r"[?&]state=([^&]+)", input_str)
             if state_match:
                 st = state_match.group(1)
 
-        url = f"http://127.0.0.1:53682/?state={st}&code={code}"
         try:
             async with httpx.AsyncClient(timeout=5.0) as client:
-                resp = await client.get(url)
+                resp = await client.get(
+                    "http://127.0.0.1:53682/",
+                    params={"state": st, "code": code},
+                )
                 return resp.status_code == 200
         except Exception as exc:  # noqa: BLE001
             logger.error("Errore nell'inoltro del callback a Rclone: %s", exc)
             return False
 
     async def cancel(self):
-        """Clean up process and state."""
+        """Clean up process, proxy server and state."""
         if self._task and not self._task.done():
             self._task.cancel()
+        if self._proxy_server:
+            try:
+                self._proxy_server.close()
+                await self._proxy_server.wait_closed()
+            except Exception as exc:  # noqa: BLE001
+                logger.debug("Proxy server close error: %s", exc)
+            self._proxy_server = None
         if self.proc and self.proc.returncode is None:
             try:
                 self.proc.terminate()

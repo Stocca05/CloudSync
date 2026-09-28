@@ -13,7 +13,7 @@ services:
     restart: unless-stopped
     ports:
       - "8000:8000"
-      - "53682:53682"
+      - "53682:53683"
     environment:
       - RCLONE_CONFIG=/app/config/rclone.conf
       - RCLONE_LOG_LEVEL=INFO
