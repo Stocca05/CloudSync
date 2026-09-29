@@ -1,6 +1,7 @@
 """Stateless trusted worker. One isolated temporary rclone config per execution.
 Fail closed when control-plane heartbeats cannot renew ownership.
 """
+
 import concurrent.futures
 import configparser
 import json
@@ -23,7 +24,9 @@ STOP = threading.Event()
 
 
 def obscure(value):
-    return subprocess.run(["rclone", "obscure", "-"], input=value, text=True, capture_output=True, check=True, timeout=10).stdout.strip()
+    return subprocess.run(
+        ["rclone", "obscure", "-"], input=value, text=True, capture_output=True, check=True, timeout=10
+    ).stdout.strip()
 
 
 def write_config(job, path):
@@ -36,6 +39,7 @@ def write_config(job, path):
         for field in ["url", "endpoint"]:
             if values.get(field):
                 from urllib.parse import urlsplit
+
                 public_host(urlsplit(values[field]).hostname)
         if "pass" in values:
             values["pass"] = obscure(values["pass"])
@@ -47,11 +51,34 @@ def write_config(job, path):
 
 def command(job, config, port, log_path):
     source = "r" + job["source_id"] + ":" + job["source_path"]
-    common = ["--config", str(config), "--use-json-log", "--log-file", str(log_path),
-              "--stats", "1s", "--stats-log-level", "NOTICE", "--retries", "1", "--low-level-retries", "3",
-              "--contimeout", "15s", "--timeout", "60s", "--transfers", "2", "--checkers", "4",
-              "--rc", "--rc-addr", f"127.0.0.1:{port}",
-              "--bwlimit", str(job["bandwidth_bps"]) + "B"]
+    common = [
+        "--config",
+        str(config),
+        "--use-json-log",
+        "--log-file",
+        str(log_path),
+        "--stats",
+        "1s",
+        "--stats-log-level",
+        "NOTICE",
+        "--retries",
+        "1",
+        "--low-level-retries",
+        "3",
+        "--contimeout",
+        "15s",
+        "--timeout",
+        "60s",
+        "--transfers",
+        "2",
+        "--checkers",
+        "4",
+        "--rc",
+        "--rc-addr",
+        f"127.0.0.1:{port}",
+        "--bwlimit",
+        str(job["bandwidth_bps"]) + "B",
+    ]
     if job["operation"] == "list":
         return ["rclone", "lsjson", source, "--no-mimetype", "--no-modtime", *common]
     operation = job["operation"]
@@ -93,16 +120,26 @@ def result_listing(path):
     if path.stat().st_size > 8_000_000:
         raise ValueError("Cartella troppo grande: scegli un percorso più specifico")
     data = json.loads(path.read_text() or "[]")
-    return {"items": [{k: item.get(k) for k in ["Path", "Name", "Size", "IsDir"]} for item in data[:1000]], "truncated": len(data) > 1000}
+    return {
+        "items": [{k: item.get(k) for k in ["Path", "Name", "Size", "IsDir"]} for item in data[:1000]],
+        "truncated": len(data) > 1000,
+    }
 
 
 def run_job(api_url, token, job):
     headers = {"Authorization": "Bearer " + token}
     auth = ("worker", os.urandom(24).hex())
     # Environment contains only runtime requirements, never the worker enrollment token.
-    env = {k: v for k, v in os.environ.items() if k in {"PATH", "HOME", "TMPDIR", "SSL_CERT_FILE", "SSL_CERT_DIR", "LANG"}}
+    env = {
+        k: v
+        for k, v in os.environ.items()
+        if k in {"PATH", "HOME", "TMPDIR", "SSL_CERT_FILE", "SSL_CERT_DIR", "LANG"}
+    }
     env.update(RCLONE_RC_USER=auth[0], RCLONE_RC_PASS=auth[1])
-    with tempfile.TemporaryDirectory(prefix="cloudsync-") as directory, httpx.Client(base_url=api_url, headers=headers, timeout=8) as api:
+    with (
+        tempfile.TemporaryDirectory(prefix="cloudsync-") as directory,
+        httpx.Client(base_url=api_url, headers=headers, timeout=8) as api,
+    ):
         root = Path(directory)
         config, log_path, output_path = root / "rclone.conf", root / "rclone.log", root / "output.json"
         job_id = job["id"]
@@ -118,7 +155,9 @@ def run_job(api_url, token, job):
                 sock.bind(("127.0.0.1", 0))
                 port = sock.getsockname()[1]
             with output_path.open("wb") as output, (root / "stderr").open("wb") as errors:
-                process = subprocess.Popen(command(job, config, port, log_path), stdout=output, stderr=errors, env=env)
+                process = subprocess.Popen(
+                    command(job, config, port, log_path), stdout=output, stderr=errors, env=env
+                )
                 with httpx.Client(base_url=f"http://127.0.0.1:{port}", auth=auth, timeout=2) as rc:
                     while True:
                         payload["stats"] = read_progress(log_path)
@@ -132,7 +171,9 @@ def run_job(api_url, token, job):
                                 stop_process(process)
                             if process.poll() is None:
                                 try:
-                                    rate_response = rc.post("/core/bwlimit", json={"rate": str(control["bandwidth_bps"]) + "B"})
+                                    rate_response = rc.post(
+                                        "/core/bwlimit", json={"rate": str(control["bandwidth_bps"]) + "B"}
+                                    )
                                     rate_response.raise_for_status()
                                 except httpx.HTTPError:
                                     # RC startup is asynchronous. A later heartbeat retries.
@@ -150,9 +191,13 @@ def run_job(api_url, token, job):
                             break
                         if process.poll() is not None:
                             break
-                        if output_path.stat().st_size > 8_000_000 or (log_path.exists() and log_path.stat().st_size > 32_000_000):
+                        if output_path.stat().st_size > 8_000_000 or (
+                            log_path.exists() and log_path.stat().st_size > 32_000_000
+                        ):
                             stop_process(process)
-                            raise ValueError("Limite output raggiunto: suddividi il trasferimento o la cartella")
+                            raise ValueError(
+                                "Limite output raggiunto: suddividi il trasferimento o la cartella"
+                            )
                         STOP.wait(3)
             if ownership_lost:
                 log.warning("job %s stopped: lease unavailable", job_id)
@@ -165,14 +210,32 @@ def run_job(api_url, token, job):
             saved.read(config)
             for remote_id, data in job["remotes"].items():
                 if data["config"]["type"] == "drive" and saved.has_option("r" + remote_id, "token"):
-                    refreshed[remote_id] = {"revision": data["revision"], "token": saved["r" + remote_id]["token"]}
-            error = "" if success or cancelled else f"Rclone terminato con codice {process.returncode}. Controlla credenziali, permessi e percorso; per SFTP verifica la chiave host sul nodo."
-            completion = {**payload, "success": success, "cancelled": cancelled, "error": error, "result": result, "refreshed": refreshed}
+                    refreshed[remote_id] = {
+                        "revision": data["revision"],
+                        "token": saved["r" + remote_id]["token"],
+                    }
+            error = (
+                ""
+                if success or cancelled
+                else f"Rclone terminato con codice {process.returncode}. Controlla credenziali, permessi e percorso; per SFTP verifica la chiave host sul nodo."
+            )
+            completion = {
+                **payload,
+                "success": success,
+                "cancelled": cancelled,
+                "error": error,
+                "result": result,
+                "refreshed": refreshed,
+            }
         except Exception as exc:
             if process:
                 stop_process(process)
             log.warning("job %s failed (%s)", job_id, type(exc).__name__)
-            completion = {**payload, "success": False, "error": "Impossibile eseguire il lavoro. Verifica il collegamento e la configurazione del nodo."}
+            completion = {
+                **payload,
+                "success": False,
+                "error": "Impossibile eseguire il lavoro. Verifica il collegamento e la configurazione del nodo.",
+            }
         if not ownership_lost:
             # Retry completion within the valid lease; duplicate/fenced completion is rejected.
             for attempt in range(3):
@@ -194,7 +257,10 @@ def main():
         signal.signal(sig, lambda *_: STOP.set())
     subprocess.run(["rclone", "version"], check=True, capture_output=True)
     futures = set()
-    with concurrent.futures.ThreadPoolExecutor(max_workers=slots) as pool, httpx.Client(base_url=api_url, headers={"Authorization": "Bearer " + token}, timeout=10) as api:
+    with (
+        concurrent.futures.ThreadPoolExecutor(max_workers=slots) as pool,
+        httpx.Client(base_url=api_url, headers={"Authorization": "Bearer " + token}, timeout=10) as api,
+    ):
         while not STOP.is_set():
             futures = {f for f in futures if not f.done()}
             if len(futures) < slots:

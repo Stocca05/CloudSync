@@ -97,9 +97,19 @@ def create_app(settings=None):
             if not db.scalar(select(User.id).limit(1)):
                 if not settings.admin_password:
                     raise RuntimeError("ADMIN_PASSWORD richiesta per il primo avvio")
-                db.add(User(username=settings.admin_user, password_hash=hash_password(settings.admin_password), admin=True))
+                db.add(
+                    User(
+                        username=settings.admin_user,
+                        password_hash=hash_password(settings.admin_password),
+                        admin=True,
+                    )
+                )
             if not db.get(ClusterConfig, 1):
-                db.add(ClusterConfig(id=1, global_bps=settings.global_bps, max_active_jobs=settings.max_active_jobs))
+                db.add(
+                    ClusterConfig(
+                        id=1, global_bps=settings.global_bps, max_active_jobs=settings.max_active_jobs
+                    )
+                )
             if settings.bootstrap_worker_token and not db.get(Node, "local"):
                 db.add(Node(id="local", token_hash=digest(settings.bootstrap_worker_token)))
         yield
@@ -124,7 +134,9 @@ def create_app(settings=None):
         response = await call_next(request)
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Referrer-Policy"] = "same-origin"
-        response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+        )
         if request.url.path.startswith(("/api/", "/internal/")):
             response.headers["Cache-Control"] = "no-store"
         return response
@@ -159,10 +171,35 @@ def create_app(settings=None):
         return obj
 
     def user_view(user):
-        return {key: getattr(user, key) for key in ["id", "username", "admin", "enabled", "weight", "max_jobs", "bandwidth_bps"]}
+        return {
+            key: getattr(user, key)
+            for key in ["id", "username", "admin", "enabled", "weight", "max_jobs", "bandwidth_bps"]
+        }
 
     def job_view(job):
-        return {key: getattr(job, key) for key in ["id", "source_id", "destination_id", "operation", "source_path", "destination_path", "is_file", "status", "priority", "created", "started", "finished", "node_id", "attempts", "stats", "result", "error", "cancel_requested"]}
+        return {
+            key: getattr(job, key)
+            for key in [
+                "id",
+                "source_id",
+                "destination_id",
+                "operation",
+                "source_path",
+                "destination_path",
+                "is_file",
+                "status",
+                "priority",
+                "created",
+                "started",
+                "finished",
+                "node_id",
+                "attempts",
+                "stats",
+                "result",
+                "error",
+                "cancel_requested",
+            ]
+        }
 
     def validate_job(db, spec, user):
         owned(db, Remote, spec.source_id, user)
@@ -179,7 +216,11 @@ def create_app(settings=None):
             raise HTTPException(400, str(exc)) from exc
         if spec.is_file and (not source or not destination):
             raise HTTPException(400, "Indica il nome del file sorgente e destinazione")
-        return {**spec.model_dump(exclude={"confirm_move"}), "source_path": source, "destination_path": destination}
+        return {
+            **spec.model_dump(exclude={"confirm_move"}),
+            "source_path": source,
+            "destination_path": destination,
+        }
 
     @app.get("/api/health")
     def health(db: Session = Depends(get_db)):
@@ -213,14 +254,27 @@ def create_app(settings=None):
             raise HTTPException(401, "Nome o password non corretti")
         token = secrets.token_urlsafe(32)
         db.execute(delete(LoginSession).where(LoginSession.expires < time.time()))
-        db.add(LoginSession(token_hash=digest(token), user_id=user.id, expires=time.time() + settings.session_seconds))
+        db.add(
+            LoginSession(
+                token_hash=digest(token), user_id=user.id, expires=time.time() + settings.session_seconds
+            )
+        )
         db.commit()
-        response.set_cookie("session", token, httponly=True, secure=settings.cookie_secure, samesite="lax", max_age=settings.session_seconds)
+        response.set_cookie(
+            "session",
+            token,
+            httponly=True,
+            secure=settings.cookie_secure,
+            samesite="lax",
+            max_age=settings.session_seconds,
+        )
         return user_view(user)
 
     @app.post("/api/auth/logout")
     def logout(request: Request, response: Response, db: Session = Depends(get_db)):
-        db.execute(delete(LoginSession).where(LoginSession.token_hash == digest(request.cookies.get("session", ""))))
+        db.execute(
+            delete(LoginSession).where(LoginSession.token_hash == digest(request.cookies.get("session", "")))
+        )
         db.commit()
         response.delete_cookie("session")
         return {"ok": True}
@@ -235,7 +289,10 @@ def create_app(settings=None):
 
     @app.get("/api/remotes")
     def remotes(user=Depends(current_user), db: Session = Depends(get_db)):
-        return [{"id": r.id, "name": r.name, "provider": r.provider} for r in db.scalars(select(Remote).where(Remote.user_id == user.id).order_by(Remote.created))]
+        return [
+            {"id": r.id, "name": r.name, "provider": r.provider}
+            for r in db.scalars(select(Remote).where(Remote.user_id == user.id).order_by(Remote.created))
+        ]
 
     @app.post("/api/remotes", status_code=201)
     def create_remote(data: RemoteInput, user=Depends(current_user), db: Session = Depends(get_db)):
@@ -245,7 +302,9 @@ def create_app(settings=None):
             config = validate_config(data.provider, data.config)
         except (ValueError, TypeError) as exc:
             raise HTTPException(400, str(exc)) from exc
-        remote = Remote(user_id=user.id, name=data.name, provider=data.provider, encrypted_config=vault.encrypt(config))
+        remote = Remote(
+            user_id=user.id, name=data.name, provider=data.provider, encrypted_config=vault.encrypt(config)
+        )
         db.add(remote)
         db.commit()
         return {"id": remote.id, "name": remote.name, "provider": remote.provider}
@@ -254,9 +313,14 @@ def create_app(settings=None):
     def delete_remote(remote_id: str, user=Depends(current_user), db: Session = Depends(get_db)):
         lock_scheduler(db)
         remote = owned(db, Remote, remote_id, user)
-        in_use = db.scalar(select(Job.id).where((Job.source_id == remote.id) | (Job.destination_id == remote.id)).limit(1))
+        in_use = db.scalar(
+            select(Job.id).where((Job.source_id == remote.id) | (Job.destination_id == remote.id)).limit(1)
+        )
         if in_use:
-            raise HTTPException(409, "Collegamento presente nella cronologia: disconnetti revocando le credenziali dal provider")
+            raise HTTPException(
+                409,
+                "Collegamento presente nella cronologia: disconnetti revocando le credenziali dal provider",
+            )
         db.delete(remote)
         db.commit()
         return {"ok": True}
@@ -265,7 +329,11 @@ def create_app(settings=None):
     def create_job(data: JobInput, user=Depends(current_user), db: Session = Depends(get_db)):
         lock_scheduler(db)
         values = validate_job(db, data, user)
-        pending = db.scalar(select(func.count()).select_from(Job).where(Job.user_id == user.id, Job.status.in_(["queued", "running"])))
+        pending = db.scalar(
+            select(func.count())
+            .select_from(Job)
+            .where(Job.user_id == user.id, Job.status.in_(["queued", "running"]))
+        )
         if pending >= settings.max_pending_per_user:
             raise HTTPException(409, "La tua coda è piena")
         job = Job(user_id=user.id, **values)
@@ -278,7 +346,15 @@ def create_app(settings=None):
         lock_scheduler(db)
         maintain(db)
         db.commit()
-        return [job_view(j) for j in db.scalars(select(Job).where(Job.user_id == user.id, Job.operation != "list").order_by(Job.created.desc()).limit(200))]
+        return [
+            job_view(j)
+            for j in db.scalars(
+                select(Job)
+                .where(Job.user_id == user.id, Job.operation != "list")
+                .order_by(Job.created.desc())
+                .limit(200)
+            )
+        ]
 
     @app.get("/api/jobs/{job_id}")
     def get_job(job_id: str, user=Depends(current_user), db: Session = Depends(get_db)):
@@ -313,7 +389,16 @@ def create_app(settings=None):
 
     @app.get("/api/schedules")
     def schedules(user=Depends(current_user), db: Session = Depends(get_db)):
-        return [{"id": s.id, "template": s.template, "interval_seconds": s.interval_seconds, "next_run": s.next_run, "enabled": s.enabled} for s in db.scalars(select(Schedule).where(Schedule.user_id == user.id))]
+        return [
+            {
+                "id": s.id,
+                "template": s.template,
+                "interval_seconds": s.interval_seconds,
+                "next_run": s.next_run,
+                "enabled": s.enabled,
+            }
+            for s in db.scalars(select(Schedule).where(Schedule.user_id == user.id))
+        ]
 
     @app.post("/api/schedules", status_code=201)
     def create_schedule(data: ScheduleInput, user=Depends(current_user), db: Session = Depends(get_db)):
@@ -323,7 +408,9 @@ def create_app(settings=None):
             raise HTTPException(400, "Le pianificazioni supportano la copia")
         if db.scalar(select(func.count()).select_from(Schedule).where(Schedule.user_id == user.id)) >= 20:
             raise HTTPException(409, "Limite di 20 pianificazioni raggiunto")
-        schedule = Schedule(user_id=user.id, template=values, interval_seconds=data.interval_seconds, next_run=time.time())
+        schedule = Schedule(
+            user_id=user.id, template=values, interval_seconds=data.interval_seconds, next_run=time.time()
+        )
         db.add(schedule)
         db.commit()
         return {"id": schedule.id}
@@ -338,10 +425,19 @@ def create_app(settings=None):
     @app.get("/api/admin/cluster")
     def cluster(user=Depends(admin), db: Session = Depends(get_db)):
         cfg = db.get(ClusterConfig, 1)
-        return {"global_bps": cfg.global_bps, "max_active_jobs": cfg.max_active_jobs,
-                "nodes": [{k: getattr(n, k) for k in ["id", "enabled", "slots", "bandwidth_bps", "last_seen", "version"]} for n in db.scalars(select(Node))],
-                "users": [user_view(u) for u in db.scalars(select(User).order_by(User.created))],
-                "rates": bandwidths(db)}
+        return {
+            "global_bps": cfg.global_bps,
+            "max_active_jobs": cfg.max_active_jobs,
+            "nodes": [
+                {
+                    k: getattr(n, k)
+                    for k in ["id", "enabled", "slots", "bandwidth_bps", "last_seen", "version"]
+                }
+                for n in db.scalars(select(Node))
+            ],
+            "users": [user_view(u) for u in db.scalars(select(User).order_by(User.created))],
+            "rates": bandwidths(db),
+        }
 
     @app.patch("/api/admin/cluster")
     def set_cluster(data: ClusterInput, user=Depends(admin), db: Session = Depends(get_db)):
@@ -364,7 +460,9 @@ def create_app(settings=None):
             setattr(target, key, value)
         if not data.enabled:
             db.execute(delete(LoginSession).where(LoginSession.user_id == target.id))
-            for job in db.scalars(select(Job).where(Job.user_id == target.id, Job.status.in_(["queued", "running"]))):
+            for job in db.scalars(
+                select(Job).where(Job.user_id == target.id, Job.status.in_(["queued", "running"]))
+            ):
                 job.cancel_requested = True
                 if job.status == "queued":
                     job.status = "cancelled"
@@ -377,7 +475,9 @@ def create_app(settings=None):
         if db.get(Node, data.name):
             raise HTTPException(409, "Nome nodo già utilizzato")
         token = secrets.token_urlsafe(48)
-        db.add(Node(id=data.name, token_hash=digest(token), slots=data.slots, bandwidth_bps=data.bandwidth_bps))
+        db.add(
+            Node(id=data.name, token_hash=digest(token), slots=data.slots, bandwidth_bps=data.bandwidth_bps)
+        )
         db.commit()
         return {"id": data.name, "token": token}
 
@@ -414,13 +514,22 @@ def create_app(settings=None):
         payload["remotes"] = {}
         for remote_id in {job.source_id, job.destination_id} - {None}:
             remote = db.get(Remote, remote_id)
-            payload["remotes"][remote_id] = {"config": vault.decrypt(remote.encrypted_config), "revision": remote.revision}
+            payload["remotes"][remote_id] = {
+                "config": vault.decrypt(remote.encrypted_config),
+                "revision": remote.revision,
+            }
         db.commit()
         return {"job": payload}
 
     def leased(db, job_id, token, node):
         job = db.get(Job, job_id)
-        if not job or job.status != "running" or job.node_id != node.id or job.lease_token != token or job.lease_until < time.time():
+        if (
+            not job
+            or job.status != "running"
+            or job.node_id != node.id
+            or job.lease_token != token
+            or job.lease_until < time.time()
+        ):
             raise HTTPException(409, "Lease scaduto: interrompi immediatamente il processo")
         return job
 
@@ -429,7 +538,11 @@ def create_app(settings=None):
         lock_scheduler(db)
         job = leased(db, job_id, data.lease_token, node)
         job.lease_until = time.time() + settings.lease_seconds
-        job.stats = {k: data.stats[k] for k in ["bytes", "totalBytes", "speed", "eta", "transfers", "checks", "errors"] if isinstance(data.stats.get(k), (int, float))}
+        job.stats = {
+            k: data.stats[k]
+            for k in ["bytes", "totalBytes", "speed", "eta", "transfers", "checks", "errors"]
+            if isinstance(data.stats.get(k), (int, float))
+        }
         node.last_seen = time.time()
         db.flush()
         result = {"cancel": job.cancel_requested, "bandwidth_bps": bandwidths(db)[job.id]}
@@ -440,7 +553,11 @@ def create_app(settings=None):
     def complete(job_id: str, data: Completion, node=Depends(worker), db: Session = Depends(get_db)):
         lock_scheduler(db)
         job = leased(db, job_id, data.lease_token, node)
-        job.stats = {k: data.stats[k] for k in ["bytes", "totalBytes", "speed", "eta", "transfers", "checks", "errors"] if isinstance(data.stats.get(k), (int, float))}
+        job.stats = {
+            k: data.stats[k]
+            for k in ["bytes", "totalBytes", "speed", "eta", "transfers", "checks", "errors"]
+            if isinstance(data.stats.get(k), (int, float))
+        }
         job.result = data.result
         job.error = data.error
         job.status = "cancelled" if data.cancelled else ("completed" if data.success else "failed")

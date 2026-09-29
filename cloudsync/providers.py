@@ -1,4 +1,5 @@
 """Closed schemas: never accept rclone flags, local paths, aliases or arbitrary config sections."""
+
 import ipaddress
 import json
 import socket
@@ -6,10 +7,26 @@ from pathlib import PurePosixPath
 from urllib.parse import urlsplit
 
 PROVIDERS = {
-    "s3": {"label": "S3 / MinIO", "fields": ["provider", "access_key_id", "secret_access_key", "region", "endpoint"], "required": ["access_key_id", "secret_access_key"]},
-    "sftp": {"label": "SFTP", "fields": ["host", "port", "user", "pass"], "required": ["host", "user", "pass"]},
-    "webdav": {"label": "WebDAV", "fields": ["url", "user", "pass", "vendor"], "required": ["url", "user", "pass"]},
-    "drive": {"label": "Google Drive · token Rclone", "fields": ["token", "client_id", "client_secret", "root_folder_id"], "required": ["token"]},
+    "s3": {
+        "label": "S3 / MinIO",
+        "fields": ["provider", "access_key_id", "secret_access_key", "region", "endpoint"],
+        "required": ["access_key_id", "secret_access_key"],
+    },
+    "sftp": {
+        "label": "SFTP",
+        "fields": ["host", "port", "user", "pass"],
+        "required": ["host", "user", "pass"],
+    },
+    "webdav": {
+        "label": "WebDAV",
+        "fields": ["url", "user", "pass", "vendor"],
+        "required": ["url", "user", "pass"],
+    },
+    "drive": {
+        "label": "Google Drive · token Rclone",
+        "fields": ["token", "client_id", "client_secret", "root_folder_id"],
+        "required": ["token"],
+    },
 }
 
 

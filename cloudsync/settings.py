@@ -10,7 +10,9 @@ class Settings:
     admin_password: str = field(default_factory=lambda: os.environ.get("ADMIN_PASSWORD", ""))
     bootstrap_worker_token: str = field(default_factory=lambda: os.environ.get("WORKER_TOKEN", ""))
     cookie_secure: bool = field(default_factory=lambda: os.environ.get("COOKIE_SECURE", "true") == "true")
-    allow_registration: bool = field(default_factory=lambda: os.environ.get("ALLOW_REGISTRATION", "true") == "true")
+    allow_registration: bool = field(
+        default_factory=lambda: os.environ.get("ALLOW_REGISTRATION", "true") == "true"
+    )
     session_seconds: int = 7 * 86400
     lease_seconds: int = 90
     global_bps: int = field(default_factory=lambda: int(os.environ.get("GLOBAL_BPS", "52428800")))

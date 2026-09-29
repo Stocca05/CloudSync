@@ -1,6 +1,7 @@
 """All dispatch transitions run inside one short PostgreSQL transaction advisory lock.
 No leader process required: multiple APIs/workers can safely request dispatch.
 """
+
 import secrets
 import time
 from collections import Counter
@@ -21,7 +22,11 @@ def lock_scheduler(db):
 def maintain(db, now=None):
     now = now or time.time()
     for job in db.scalars(select(Job).where(Job.status == "running", Job.lease_until < now)):
-        job.status = "cancelled" if job.cancel_requested else ("queued" if job.attempts < job.max_attempts else "failed")
+        job.status = (
+            "cancelled"
+            if job.cancel_requested
+            else ("queued" if job.attempts < job.max_attempts else "failed")
+        )
         job.error = "Worker non raggiungibile: esecuzione interrotta"
         job.lease_token = None
         job.lease_until = None
@@ -80,7 +85,9 @@ def claim(db, node, lease_seconds):
     counts = Counter(j.user_id for j in active)
     candidates = list(db.scalars(select(Job).where(Job.status == "queued", Job.available_at <= now)))
     users = {u.id: u for u in db.scalars(select(User).where(User.enabled.is_(True)))}
-    candidates = [j for j in candidates if j.user_id in users and counts[j.user_id] < users[j.user_id].max_jobs]
+    candidates = [
+        j for j in candidates if j.user_id in users and counts[j.user_id] < users[j.user_id].max_jobs
+    ]
     if not candidates:
         return None
     # Least recently served user prevents starvation. Priority orders only that user's queue.

@@ -1,0 +1,66 @@
+name: cloudsync
+x-runtime: &runtime
+  build: .
+  image: cloudsync:0.2.0
+  restart: unless-stopped
+  init: true
+  read_only: true
+  tmpfs:
+    - /tmp:size=128m,mode=1777
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  logging:
+    driver: json-file
+    options: {max-size: 10m, max-file: "3"}
+services:
+  db:
+    image: postgres:17.9-bookworm
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: cloudsync
+      POSTGRES_USER: cloudsync
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Run ./start}
+    volumes: [database:/var/lib/postgresql/data]
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U cloudsync -d cloudsync"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    mem_limit: 1g
+  api:
+    <<: *runtime
+    depends_on:
+      db: {condition: service_healthy}
+    environment:
+      DATABASE_URL: postgresql+psycopg://cloudsync:${DB_PASSWORD}@db/cloudsync
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?Run ./start}
+      ADMIN_USER: ${ADMIN_USER:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Run ./start}
+      WORKER_TOKEN: ${WORKER_TOKEN:?Run ./start}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      ALLOW_REGISTRATION: ${ALLOW_REGISTRATION:-true}
+      GLOBAL_BPS: ${GLOBAL_BPS:-52428800}
+    ports: ["${BIND_ADDRESS:-127.0.0.1}:${PORT:-8080}:8000"]
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health',timeout=3)"]
+      interval: 5s
+      timeout: 4s
+      retries: 20
+    mem_limit: 1g
+  worker:
+    <<: *runtime
+    depends_on:
+      api: {condition: service_healthy}
+    command: [python, -m, cloudsync.worker]
+    environment:
+      CONTROL_URL: http://api:8000
+      WORKER_TOKEN: ${WORKER_TOKEN}
+      WORKER_SLOTS: ${WORKER_SLOTS:-2}
+      SFTP_KNOWN_HOSTS: /etc/cloudsync/known_hosts
+    volumes: ["./runtime/known_hosts:/etc/cloudsync/known_hosts:ro"]
+    stop_grace_period: 45s
+    mem_limit: 1g
+    cpus: 2
+    pids_limit: 256
+volumes:
+  database:
