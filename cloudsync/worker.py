@@ -147,7 +147,9 @@ def run_job(api_url, token, job):
         payload = {"lease_token": job["lease_token"], "stats": {}}
         process = None
         cancelled = False
+        shutdown = False
         ownership_lost = False
+        last_rate_applied = time.monotonic()
         last_renewed = time.monotonic()
         try:
             write_config(job, config)
@@ -167,7 +169,8 @@ def run_job(api_url, token, job):
                             control = response.json()
                             last_renewed = time.monotonic()
                             if control["cancel"] or STOP.is_set():
-                                cancelled = True
+                                cancelled = control["cancel"]
+                                shutdown = STOP.is_set() and not cancelled
                                 stop_process(process)
                             if process.poll() is None:
                                 try:
@@ -175,6 +178,7 @@ def run_job(api_url, token, job):
                                         "/core/bwlimit", json={"rate": str(control["bandwidth_bps"]) + "B"}
                                     )
                                     rate_response.raise_for_status()
+                                    last_rate_applied = time.monotonic()
                                 except httpx.HTTPError:
                                     # RC startup is asynchronous. A later heartbeat retries.
                                     pass
@@ -185,25 +189,28 @@ def run_job(api_url, token, job):
                                 break
                         except httpx.HTTPError:
                             pass
+                        if time.monotonic() - last_rate_applied > 20 and process.poll() is None:
+                            stop_process(process)
+                            raise RuntimeError("Bandwidth controller unavailable")
                         if time.monotonic() - last_renewed > 25:
                             ownership_lost = True
                             stop_process(process)
                             break
                         if process.poll() is not None:
                             break
-                        if output_path.stat().st_size > 8_000_000 or (
-                            log_path.exists() and log_path.stat().st_size > 32_000_000
-                        ):
+                        if output_path.stat().st_size > 8_000_000:
                             stop_process(process)
-                            raise ValueError(
-                                "Limite output raggiunto: suddividi il trasferimento o la cartella"
-                            )
+                            raise ValueError("Cartella troppo grande")
+                        if log_path.exists() and log_path.stat().st_size > 8_000_000:
+                            # rclone opens logs with O_APPEND; retain bounded memory for days-long transfers.
+                            with log_path.open("w"):
+                                pass
                         STOP.wait(3)
             if ownership_lost:
                 log.warning("job %s stopped: lease unavailable", job_id)
                 return
             payload["stats"] = read_progress(log_path)
-            success = process.returncode == 0 and not cancelled
+            success = process.returncode == 0 and not cancelled and not shutdown
             result = result_listing(output_path) if success and job["operation"] == "list" else {}
             refreshed = {}
             saved = configparser.ConfigParser(interpolation=None)
@@ -250,6 +257,7 @@ def run_job(api_url, token, job):
 
 def main():
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    logging.getLogger("httpx").setLevel(logging.WARNING)
     api_url = os.environ.get("CONTROL_URL", "http://api:8000")
     token = os.environ["WORKER_TOKEN"]
     slots = max(1, min(32, int(os.environ.get("WORKER_SLOTS", "2"))))

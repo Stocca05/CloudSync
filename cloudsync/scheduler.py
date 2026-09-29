@@ -41,7 +41,7 @@ def maintain(db, now=None):
             continue
         source = db.get(Remote, schedule.template["source_id"])
         dest = db.get(Remote, schedule.template.get("destination_id"))
-        if not source or not dest:
+        if not source or not dest or not source.enabled or not dest.enabled:
             schedule.enabled = False
             continue
         job = Job(user_id=schedule.user_id, **schedule.template)
@@ -83,15 +83,18 @@ def claim(db, node, lease_seconds):
     if sum(j.node_id == node.id for j in active) >= node.slots:
         return None
     counts = Counter(j.user_id for j in active)
-    candidates = list(db.scalars(select(Job).where(Job.status == "queued", Job.available_at <= now)))
-    users = {u.id: u for u in db.scalars(select(User).where(User.enabled.is_(True)))}
-    candidates = [
-        j for j in candidates if j.user_id in users and counts[j.user_id] < users[j.user_id].max_jobs
-    ]
-    if not candidates:
-        return None
+    saturated = [user_id for user_id, count in counts.items() if count >= db.get(User, user_id).max_jobs]
+    query = (
+        select(Job)
+        .join(User, Job.user_id == User.id)
+        .where(Job.status == "queued", Job.available_at <= now, User.enabled.is_(True))
+    )
+    if saturated:
+        query = query.where(Job.user_id.not_in(saturated))
     # Least recently served user prevents starvation. Priority orders only that user's queue.
-    job = min(candidates, key=lambda j: (users[j.user_id].last_dispatch, -j.priority, j.created))
+    job = db.scalar(query.order_by(User.last_dispatch, Job.priority.desc(), Job.created).limit(1))
+    if not job:
+        return None
     job.status = "running"
     job.node_id = node.id
     job.lease_token = secrets.token_hex(24)
@@ -101,6 +104,6 @@ def claim(db, node, lease_seconds):
     job.attempts += 1
     job.error = ""
     job.stats = {}
-    users[job.user_id].last_dispatch = now
+    db.get(User, job.user_id).last_dispatch = now
     db.flush()
     return job

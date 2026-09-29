@@ -36,6 +36,7 @@ class LoginSession(Base):
 
 class Remote(Base):
     __tablename__ = "remotes"
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=uid)
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
     name: Mapped[str] = mapped_column(String(80))

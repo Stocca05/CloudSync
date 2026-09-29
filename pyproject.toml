@@ -11,6 +11,7 @@ dependencies = [
 dev = ["pytest>=8,<10", "ruff>=0.9", "playwright>=1.50"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]
 [tool.ruff]
 line-length = 110
 [tool.ruff.lint]

@@ -1,6 +1,19 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f /etc/cloudsync/role ]; then
+  if [ "$(id -u)" != 0 ]; then echo 'Usa sudo ./start nel container.' >&2; exit 1; fi
+  if [ "$(cat /etc/cloudsync/role)" = server ]; then systemctl restart cloudsync-api; fi
+  systemctl restart cloudsync-worker
+  echo 'Servizi CloudSync avviati con systemd.'
+  exit 0
+fi
+if [ "${1:-}" = native ]; then
+  exec ./deploy/install-lxc.sh "${2:-server}"
+fi
+if ! command -v docker >/dev/null && [ "$(uname -s)" = Linux ] && [ "$(id -u)" = 0 ]; then
+  exec ./deploy/install-lxc.sh "${1:-server}"
+fi
 if ! command -v docker >/dev/null || ! docker compose version >/dev/null 2>&1; then
   echo 'Docker Engine e Docker Compose sono necessari. Vedi docs/DEPLOYMENT.md.' >&2
   exit 1
@@ -44,7 +57,8 @@ GLOBAL_BPS=52428800
 ENV
     echo 'Primo avvio: account admin e password salvati in .env (permessi 600).'
   fi
-  docker compose up -d --build --wait --wait-timeout 180
+  docker compose build api
+  docker compose up -d --no-build --wait --wait-timeout 180
   echo 'CloudSync avviato. Indirizzo predefinito: http://127.0.0.1:8080'
   echo 'Nome e password amministratore: ADMIN_USER e ADMIN_PASSWORD nel file .env.'
 else

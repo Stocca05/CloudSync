@@ -166,7 +166,7 @@ def create_app(settings=None):
 
     def owned(db, model, key, user):
         obj = db.get(model, key)
-        if not obj or obj.user_id != user.id:
+        if not obj or obj.user_id != user.id or (model is Remote and not obj.enabled):
             raise HTTPException(404, "Risorsa non trovata")
         return obj
 
@@ -291,7 +291,11 @@ def create_app(settings=None):
     def remotes(user=Depends(current_user), db: Session = Depends(get_db)):
         return [
             {"id": r.id, "name": r.name, "provider": r.provider}
-            for r in db.scalars(select(Remote).where(Remote.user_id == user.id).order_by(Remote.created))
+            for r in db.scalars(
+                select(Remote)
+                .where(Remote.user_id == user.id, Remote.enabled.is_(True))
+                .order_by(Remote.created)
+            )
         ]
 
     @app.post("/api/remotes", status_code=201)
@@ -313,15 +317,22 @@ def create_app(settings=None):
     def delete_remote(remote_id: str, user=Depends(current_user), db: Session = Depends(get_db)):
         lock_scheduler(db)
         remote = owned(db, Remote, remote_id, user)
-        in_use = db.scalar(
-            select(Job.id).where((Job.source_id == remote.id) | (Job.destination_id == remote.id)).limit(1)
-        )
-        if in_use:
-            raise HTTPException(
-                409,
-                "Collegamento presente nella cronologia: disconnetti revocando le credenziali dal provider",
+        remote.enabled = False
+        remote.encrypted_config = vault.encrypt({})
+        remote.revision += 1
+        for job in db.scalars(
+            select(Job).where(
+                (Job.source_id == remote.id) | (Job.destination_id == remote.id),
+                Job.status.in_(["queued", "running"]),
             )
-        db.delete(remote)
+        ):
+            job.cancel_requested = True
+            if job.status == "queued":
+                job.status = "cancelled"
+                job.finished = time.time()
+        for schedule in db.scalars(select(Schedule).where(Schedule.user_id == user.id)):
+            if remote.id in {schedule.template.get("source_id"), schedule.template.get("destination_id")}:
+                schedule.enabled = False
         db.commit()
         return {"ok": True}
 
@@ -572,7 +583,7 @@ def create_app(settings=None):
             if remote_id not in {job.source_id, job.destination_id}:
                 continue
             remote = db.get(Remote, remote_id)
-            if update.get("revision") != remote.revision or remote.provider != "drive":
+            if not remote.enabled or update.get("revision") != remote.revision or remote.provider != "drive":
                 continue
             config = vault.decrypt(remote.encrypted_config)
             token = update.get("token")
