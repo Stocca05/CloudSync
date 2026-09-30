@@ -37,7 +37,7 @@ class JobInput(BaseModel):
     destination_id: str | None = None
     source_path: str = ""
     destination_path: str = ""
-    operation: Literal["list", "copy", "move"] = "copy"
+    operation: Literal["list", "copy", "move", "mkdir", "delete"] = "copy"
     is_file: bool = False
     priority: int = Field(default=0, ge=0, le=2)
     confirm_move: bool = False

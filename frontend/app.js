@@ -32,7 +32,28 @@ const fieldLabels={provider:'Provider S3 (AWS, Minio, Other…)',access_key_id:'
 function providerFields(){const type=$('provider').value,schema=state.providers[type],root=$('provider-fields');root.replaceChildren();$('remote-submit').textContent=type==='drive'?'Accedi con Google':'Salva collegamento';$('remote-submit').disabled=type==='drive'&&!state.google.configured;$('provider-help').textContent=type==='iclouddrive'?'Usa la password del tuo account Apple, non una password specifica per app. Il passaggio successivo chiederà il codice 2FA ricevuto sul tuo dispositivo.':type==='drive'?(state.google.configured?(state.google.method==='rclone'?'Accedi con il client Google di Rclone. L’assistente CloudSync deve essere attivo sul computer con cui navighi: aprirà Google e collegherà l’account automaticamente. L’assistente va avviato su ciascun computer che usi per collegare Google.':'Scegli il tuo account Google e autorizza CloudSync. Non servono file, ID o token.'):'L’amministratore deve attivare una sola volta l’accesso Google per questo sito. Poi potrai scegliere il tuo account senza file o token.'):type==='sftp'?'Il nodo deve conoscere la chiave host SFTP in known_hosts. Sono accettati host pubblici.':'Inserisci le credenziali del servizio. La connessione sarà verificata aprendo una cartella.';if(type==='drive'&&state.google.method==='rclone'){const link=el('a','','Scarica assistente Google');link.href='/api/google/helper';link.download='CloudSync-Google.py';root.append(link,el('p','muted','Su un nuovo computer: installa Python 3 e Rclone, poi esegui python3 CloudSync-Google.py e lascia l’assistente aperto. Torna qui e premi Accedi con Google.'));}for(const field of (type==='drive'?[]:schema.fields)){const label=el('label','',fieldLabels[field]||field),input=el(field==='token'?'textarea':'input');input.name=field;input.required=schema.required.includes(field);if(['pass','password','secret_access_key','client_secret'].includes(field))input.type='password';if(field==='provider')input.value='AWS';if(field==='vendor')input.value='other';if(field==='port')input.value='22';label.append(input);root.append(label);}}
 function openRemote(){editingRemote=null;$('provider').disabled=false;$('remote-form').reset();$('remote-error').textContent='';$('provider').replaceChildren();Object.entries(state.providers).forEach(([id,p])=>$('provider').add(new Option(p.label,id)));providerFields();$('remote-dialog').showModal();}$('add-remote').onclick=openRemote;$('provider').onchange=providerFields;
 $('remote-form').onsubmit=async e=>{e.preventDefault();e.submitter.disabled=true;try{const config={};$('provider-fields').querySelectorAll('input,textarea').forEach(i=>{if(i.value)config[i.name]=i.value;});const provider=$('provider').value;if(provider==='drive'){const auth=await post('/google/start',{name:e.target.elements.name.value});window.location.assign(auth.url);return;}const values={name:e.target.elements.name.value,provider,config};const remote=editingRemote?await api('/remotes/'+editingRemote,{method:'PATCH',body:JSON.stringify(values)}):await post('/remotes',values);$('remote-dialog').close();e.target.reset();await loadRemotes();if(provider==='iclouddrive')await startApple(remote.id);else toast('Collegamento salvato. Apri una cartella per verificarlo.');}catch(err){$('remote-error').textContent=err.message;}finally{e.submitter.disabled=false;}};
-async function browse(side){const id=$(side+'-remote').value,path=$(side+'-path').value;if(!id)throw new Error('Scegli un collegamento');const root=$(side+'-files');root.replaceChildren(el('p','muted','Lettura in coda… Il worker aprirà la cartella.'));const job=await post('/jobs',{operation:'list',source_id:id,source_path:path});let data;for(let i=0;i<90;i++){await new Promise(r=>setTimeout(r,1500));data=await api('/jobs/'+job.id);if(['completed','failed','cancelled'].includes(data.status))break;}root.replaceChildren();if(data.status!=='completed'){root.append(el('p','error',data.error||'La lettura non è ancora terminata. Riprova tra poco.'));return;}if(path){root.append(button('↑ Cartella superiore',()=>{$(side+'-path').value=path.split('/').slice(0,-1).join('/');return browse(side);},'quiet'));}for(const item of data.result.items||[]){const row=button((item.IsDir?'▱ ':'· ')+item.Name,()=>{const p=[path,item.Path].filter(Boolean).join('/');$(side+'-path').value=p;if(item.IsDir)return browse(side);if(side==='source'){$('is-file').checked=true;$('destination-path').value=[$('destination-path').value,item.Name].filter(Boolean).join('/');}},'');row.append(el('small','',item.IsDir?'Cartella':bytes(item.Size)));root.append(row);}if(!data.result.items?.length)root.append(el('p','muted','Questa cartella è vuota.'));if(data.result.truncated)root.append(el('p','notice','Mostrati i primi 1.000 elementi.'));}
+async function browse(side){const id=$(side+'-remote').value,path=$(side+'-path').value;if(!id)throw new Error('Scegli un collegamento');const root=$(side+'-files');root.replaceChildren(el('p','muted','Lettura in coda… Il worker aprirà la cartella.'));const job=await post('/jobs',{operation:'list',source_id:id,source_path:path});let data;for(let i=0;i<90;i++){await new Promise(r=>setTimeout(r,1500));data=await api('/jobs/'+job.id);if(['completed','failed','cancelled'].includes(data.status))break;}root.replaceChildren();if(data.status!=='completed'){root.append(el('p','error',data.error||'La lettura non è ancora terminata. Riprova tra poco.'));return;}if(path){root.append(button('↑ Cartella superiore',()=>{$(side+'-path').value=path.split('/').slice(0,-1).join('/');return browse(side);},'quiet'));}
+for(const item of data.result.items||[]){
+  const container = el('div');
+  container.style.display = 'flex';
+  container.style.gap = '0.5rem';
+  
+  const row = button((item.IsDir?'▱ ':'· ')+item.Name,()=>{const p=[path,item.Path].filter(Boolean).join('/');$(side+'-path').value=p;if(item.IsDir)return browse(side);if(side==='source'){$('is-file').checked=true;$('destination-path').value=[$('destination-path').value,item.Name].filter(Boolean).join('/');}},'');
+  row.append(el('small','',item.IsDir?'Cartella':bytes(item.Size)));
+  row.style.flex = '1';
+  
+  const delBtn = button('✕', (e) => {
+    e.stopPropagation();
+    handleDelete(side, [path, item.Path].filter(Boolean).join('/'), item.IsDir);
+  }, 'quiet');
+  delBtn.title = 'Elimina';
+  delBtn.style.padding = '0.75rem';
+  delBtn.style.color = '#EF4444';
+  
+  container.append(row, delBtn);
+  root.append(container);
+}
+if(!data.result.items?.length)root.append(el('p','muted','Questa cartella è vuota.'));if(data.result.truncated)root.append(el('p','notice','Mostrati i primi 1.000 elementi.'));}
 $('browse-source').onclick=()=>guard(()=>browse('source'));$('browse-destination').onclick=()=>guard(()=>browse('destination'));
 function transferSpec(){return {source_id:$('source-remote').value,destination_id:$('destination-remote').value,source_path:$('source-path').value,destination_path:$('destination-path').value,operation:$('operation').value,is_file:$('is-file').checked,priority:Number($('priority').value)};}
 $('transfer-form').onsubmit=e=>{e.preventDefault();guard(async()=>{const data=transferSpec();if(!data.source_id||!data.destination_id)throw new Error('Scegli sorgente e destinazione');if(data.operation==='move'){if(!confirm('Spostare i file? Gli originali trasferiti con successo saranno rimossi dalla sorgente.'))return;data.confirm_move=true;}await post('/jobs',data);toast('Trasferimento in coda. Puoi chiudere il browser.');await page('overview');await refresh();});};
@@ -73,5 +94,139 @@ async function pollApple(){if(!$('apple-dialog').open){clearInterval(appleTimer)
 async function sendApple(answer){$('apple-submit').disabled=true;try{await post('/jobs/'+appleJob+'/answer',{challenge_id:appleChallenge,answer});$('apple-answer').value='';$('apple-status').textContent='Risposta inviata. Attendo Apple…';}catch(e){$('apple-submit').disabled=false;throw e;}}
 $('apple-form').onsubmit=e=>{e.preventDefault();guard(()=>sendApple($('apple-answer').value));};
 $('apple-cancel').onclick=()=>guard(async()=>{if(appleJob)await post('/jobs/'+appleJob+'/cancel');$('apple-dialog').close();clearInterval(appleTimer);});
-const googleResult=new URLSearchParams(location.search).get('google');if(googleResult){history.replaceState({},'',location.pathname);toast({connected:'Google Drive collegato.',cancelled:'Autorizzazione Google annullata.',expired:'Richiesta Google scaduta. Riprova da Collegamenti.',failed:'Google non ha completato l’accesso. Riprova e concedi l’accesso a Drive.'}[googleResult]||'Accesso Google terminato.');}
+const googleResult=new URLSearchParams(location.search).get('google');if(googleResult){history.replaceState({},'',location.pathname);toast({connected:'Google Drive collegato.',cancelled:'Autorizzazione Google annullata.',expired:'Richiesta Google scaduta. Riprova da Collegamenti.',failed:'Google non ha completato l’accesso. Riprova e concedi l’accesso a Drive.'}[googleResult]||'Accesso Google terminato.'); if(googleResult==='connected') setTimeout(()=>page('explorer'), 300); }
 try{const options=await api('/auth/options');$('register').hidden=!options.registration;await enter();}catch{ /* Login is the initial screen when no session exists. */ }
+
+// Chart logic
+let speedChart = null;
+const speedHistory = Array(20).fill(0);
+const labelsHistory = Array(20).fill('');
+
+function updateChart(speedBytes) {
+  if (!speedChart) {
+    const ctx = document.getElementById('speedChart').getContext('2d');
+    
+    // Create gradient
+    const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+    gradient.addColorStop(0, 'rgba(56, 189, 248, 0.5)');
+    gradient.addColorStop(1, 'rgba(56, 189, 248, 0.0)');
+
+    speedChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: labelsHistory,
+        datasets: [{
+          label: 'Velocità globale (MiB/s)',
+          data: speedHistory,
+          borderColor: '#38bdf8',
+          backgroundColor: gradient,
+          borderWidth: 2,
+          pointRadius: 0,
+          fill: true,
+          tension: 0.4
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { duration: 500 },
+        scales: {
+          x: { display: false },
+          y: { 
+            beginAtZero: true, 
+            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+            ticks: { color: '#94a3b8' }
+          }
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: { mode: 'index', intersect: false }
+        }
+      }
+    });
+  }
+
+  const speedMiB = (speedBytes / 1048576).toFixed(2);
+  speedHistory.push(speedMiB);
+  speedHistory.shift();
+  labelsHistory.push(new Date().toLocaleTimeString('it-IT'));
+  labelsHistory.shift();
+  
+  speedChart.update();
+}
+
+// Hook into renderJobs to update chart
+const oldRenderJobs = renderJobs;
+renderJobs = function() {
+  oldRenderJobs();
+  const activeJobs = state.jobs.filter(j => j.status === 'running');
+  const speed = activeJobs.reduce((s, j) => s + (j.stats.speed || 0), 0);
+  updateChart(speed);
+};
+
+
+
+
+async function handleMkdir(side) {
+  const id = document.getElementById(side+'-remote').value;
+  let currentPath = document.getElementById(side+'-path').value;
+  if (!id) {
+    toast('Scegli prima un collegamento.');
+    return;
+  }
+  const folderName = prompt('Nome della nuova cartella (verrà creata in ' + (currentPath || 'radice') + '):');
+  if (!folderName) return;
+  const newPath = [currentPath, folderName].filter(Boolean).join('/');
+  
+  toast('Creazione cartella in corso...');
+  const root = document.getElementById(side+'-files');
+  root.replaceChildren(el('p','muted','Creazione in corso...'));
+  
+  try {
+    const job = await post('/jobs', { operation: 'mkdir', source_id: id, source_path: newPath });
+    let data;
+    for(let i=0; i<30; i++) {
+      await new Promise(r => setTimeout(r, 1000));
+      data = await api('/jobs/' + job.id);
+      if (['completed', 'failed', 'cancelled'].includes(data.status)) break;
+    }
+    if (data.status === 'completed') {
+      document.getElementById(side+'-path').value = newPath;
+      toast('Cartella creata con successo.');
+      await browse(side);
+    } else {
+      toast('Errore: ' + (data.error || 'Creazione fallita.'));
+      await browse(side);
+    }
+  } catch (err) {
+    toast(err.message);
+  }
+}
+
+document.getElementById('mkdir-source').onclick = () => guard(() => handleMkdir('source'));
+document.getElementById('mkdir-destination').onclick = () => guard(() => handleMkdir('destination'));
+
+
+async function handleDelete(side, targetPath, isDir) {
+  if (!confirm('Vuoi davvero eliminare ' + (isDir ? 'la cartella' : 'il file') + ' ' + targetPath + '?
+Questa operazione è irreversibile.')) return;
+  const id = document.getElementById(side+'-remote').value;
+  toast('Eliminazione in corso...');
+  try {
+    const job = await post('/jobs', { operation: 'delete', source_id: id, source_path: targetPath, is_file: !isDir });
+    let data;
+    for(let i=0; i<30; i++) {
+      await new Promise(r => setTimeout(r, 1000));
+      data = await api('/jobs/' + job.id);
+      if (['completed', 'failed', 'cancelled'].includes(data.status)) break;
+    }
+    if (data.status === 'completed') {
+      toast('Eliminato con successo.');
+      await browse(side);
+    } else {
+      toast('Errore: ' + (data.error || 'Eliminazione fallita.'));
+    }
+  } catch (err) {
+    toast(err.message);
+  }
+}
