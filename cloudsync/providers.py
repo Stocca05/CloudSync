@@ -7,6 +7,11 @@ from pathlib import PurePosixPath
 from urllib.parse import urlsplit
 
 PROVIDERS = {
+    "iclouddrive": {
+        "label": "iCloud Drive · Apple ID e 2FA",
+        "fields": ["apple_id", "password"],
+        "required": ["apple_id", "password"],
+    },
     "s3": {
         "label": "S3 / MinIO",
         "fields": ["provider", "access_key_id", "secret_access_key", "region", "endpoint"],

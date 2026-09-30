@@ -81,3 +81,9 @@ Sono consentite solo copie periodiche. Lo spostamento resta una scelta esplicita
 ## Riferimenti
 
 [Rclone Remote Control](https://rclone.org/rc/) · [Rclone copy](https://rclone.org/commands/rclone_copy/) · [PostgreSQL advisory locks](https://www.postgresql.org/docs/current/explicit-locking.html#ADVISORY-LOCKS)
+
+## Connessione iCloud
+
+La procedura di configurazione è un lavoro `configure` con un solo tentativo automatico. Il worker mantiene vivo un daemon Rclone RC privato, così la conversazione Apple non perde lo stato fra le domande. Il browser vede solo una domanda sanitizzata, mai lo stato interno Rclone né i cookie Apple.
+
+Le risposte sono cifrate in una tabella separata e consegnate soltanto al possessore del lease corrente; un identificatore di conferma evita di perderle se un heartbeat deve essere ripetuto. Al completamento vengono salvati nel vault solo i campi di sessione previsti, con controllo della revisione. La password originale resta cifrata nel vault: l'oscuramento Rclone da solo non è usato come protezione a riposo.

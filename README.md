@@ -24,7 +24,7 @@ CloudSync dà un'interfaccia web a **Rclone**. Ogni utente collega i propri serv
 
 - **Mac o server con Docker Compose:** costruisce e avvia database, API e worker; apre il servizio su `http://127.0.0.1:8080`.
 - **Container Linux dedicato, root e senza Docker:** installa la versione nativa con systemd.
-- **Installazione nativa già presente:** riavvia i servizi.
+- **Installazione nativa già presente:** avvia i servizi e verifica la salute, senza interrompere quelli già attivi.
 - **LXC con Docker già installato:** il primo avvio nativo è `./start native`; da quel momento basta `./start`.
 
 Al primo avvio vengono generati i segreti e l'account `admin`. La password si trova in `.env` per Docker, oppure `/etc/cloudsync/server.env` per l'installazione nativa. Non viene stampata nei log. Ogni amico può registrarsi con **nome e password**, senza email né requisiti di complessità.
@@ -47,7 +47,7 @@ Al primo avvio vengono generati i segreti e l'account `admin`. La password si tr
 | WebDAV / Nextcloud | URL HTTPS, nome e password | Implementato |
 | SFTP | Host, utente, password; chiave host verificata dall'amministratore | Implementato |
 | Google Drive | Token JSON di `rclone authorize drive` | Implementato; login OAuth web diretto non incluso |
-| iCloud Drive | Password Apple, 2FA e backend `iclouddrive` | Non ancora incluso; nessun falso collegamento WebDAV |
+| iCloud Drive | Password Apple, 2FA e backend `iclouddrive` | Procedura guidata implementata; accesso Apple reale da collaudare |
 
 L'implementazione di un provider non equivale a una verifica sul tuo account. I test automatici eseguono copie reali con Rclone su dati temporanei; il collaudo cloud richiede account di prova. I provider personalizzati sono limitati a endpoint pubblici; i servizi LAN richiedono una politica di rete dedicata prima di essere abilitati.
 
@@ -87,9 +87,9 @@ cloudsync/      API, dati, sicurezza, scheduler, worker Rclone
 frontend/       Interfaccia senza CDN, asset serviti localmente
 start           Punto di ingresso unico
 compose*.yaml   Server completo e worker aggiuntivi
- deploy/        Installazione LXC e unità systemd
- tests/         Isolamento, lease, concorrenza, copie vere, browser
- docs/          Guide operative, architettura e verifica
+deploy/        Installazione LXC e unità systemd
+tests/         Isolamento, lease, concorrenza, copie vere, browser
+docs/          Guide operative, architettura e verifica
 ```
 
 ## Documentazione

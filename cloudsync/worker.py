@@ -41,8 +41,9 @@ def write_config(job, path):
                 from urllib.parse import urlsplit
 
                 public_host(urlsplit(values[field]).hostname)
-        if "pass" in values:
-            values["pass"] = obscure(values["pass"])
+        for key in ["pass", "password"]:
+            if key in values:
+                values[key] = obscure(values[key])
         config["r" + remote_id] = values
     with path.open("w") as output:
         config.write(output)
@@ -127,6 +128,10 @@ def result_listing(path):
 
 
 def run_job(api_url, token, job):
+    if job["operation"] == "configure":
+        from .icloud_auth import configure_icloud
+
+        return configure_icloud(api_url, token, job, STOP)
     headers = {"Authorization": "Bearer " + token}
     auth = ("worker", os.urandom(24).hex())
     # Environment contains only runtime requirements, never the worker enrollment token.
@@ -216,11 +221,17 @@ def run_job(api_url, token, job):
             saved = configparser.ConfigParser(interpolation=None)
             saved.read(config)
             for remote_id, data in job["remotes"].items():
-                if data["config"]["type"] == "drive" and saved.has_option("r" + remote_id, "token"):
-                    refreshed[remote_id] = {
-                        "revision": data["revision"],
-                        "token": saved["r" + remote_id]["token"],
-                    }
+                provider = data["config"]["type"]
+                keys = (
+                    ["token"]
+                    if provider == "drive"
+                    else (["cookies", "trust_token", "client_id"] if provider == "iclouddrive" else [])
+                )
+                values = {
+                    key: saved["r" + remote_id][key] for key in keys if saved.has_option("r" + remote_id, key)
+                }
+                if values:
+                    refreshed[remote_id] = {"revision": data["revision"], **values}
             error = (
                 ""
                 if success or cancelled

@@ -55,4 +55,11 @@ Il test avvia un'app temporanea su loopback e usa Chrome headless. Prova login, 
 
 ## Da non confondere con verifiche già concluse
 
-Le integrazioni cloud richiedono ancora account reali del proprietario per un collaudo specifico. Il test browser non autentica Google Drive. iCloud e OAuth web diretto non sono implementati. HTTPS pubblico, egress firewall e prova su un secondo container Proxmox devono essere verificati nella topologia definitiva.
+Le integrazioni cloud richiedono ancora account reali del proprietario per un collaudo specifico. Il test browser non autentica Google Drive. La procedura iCloud è verificata con risposte Rclone/Apple simulate, ma non ancora con un account Apple reale. OAuth web Google diretto non è implementato. HTTPS pubblico, egress firewall e prova su un secondo container Proxmox devono essere verificati nella topologia definitiva.
+
+
+## Aggiornamento iCloud e restrizioni della sessione
+
+La suite aggiunge due test per la configurazione `iclouddrive`: isolamento della richiesta 2FA, cifratura della risposta, conferma di ricezione e protocollo `config/create → config/update → config/get`. Il binario Rclone 1.75.1 installato espone i campi `apple_id`, `password`, `trust_token`, `cookies` e `client_id` attesi.
+
+Dopo il cambio delle restrizioni dell'ambiente di sviluppo, l'esecuzione completa è risultata: **17 test passati, 1 test PostgreSQL non eseguito senza URL, 1 test di copia reale bloccato dal divieto di aprire socket localhost**. La precedente suite di 17 test, inclusi PostgreSQL e copia reale, era passata prima del cambio. Non si tratta di un collaudo reale del nuovo flusso Apple.

@@ -35,7 +35,7 @@ L'installer:
 6. Installa e abilita le unità systemd, con utente non privilegiato e filesystem protetto.
 7. Verifica `/api/health`.
 
-Da quel momento:
+Da quel momento (non interrompe servizi già attivi):
 
 ```bash
 cd /opt/cloudsync

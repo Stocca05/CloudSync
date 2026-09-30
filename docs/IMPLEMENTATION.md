@@ -24,5 +24,9 @@ Un servizio web persistente per utenti con username/password semplici, collegame
 ## Verifiche richieste
 Isolamento tra due utenti; due worker concorrenti; revoca lease; annullamento; riavvio; allocazione banda; copia reale con confronto hash; avvio completo da directory pulita; nessun segreto in Git.
 
-## Da ricevere
-IP, utente e porta SSH, chiave già disponibile, tipo host/container/VM, nodi autorizzati; provider prioritari e dominio HTTPS.
+## Distribuzione e stato
+Il proprietario ha indicato un container LXC Debian 12, accessibile via SSH come root. Installazione nativa effettuata; API 0.2.0 e worker verificati attivi, endpoint salute positivo prima del cambio di permessi della sessione. Dati legacy salvati prima dell'installazione.
+
+La restrizione di rete successiva impedisce nuovi collegamenti SSH, accesso Docker e test con socket locali. Gli aggiornamenti iCloud successivi sono quindi locali e richiedono una nuova distribuzione quando la sessione avrà accesso di rete. L'esito dell'ultimo collaudo remoto multiworker non è stato recuperato; non viene dichiarato riuscito.
+
+Provider richiesti: Google Drive, S3, SFTP, WebDAV e iCloud. Restano da definire dominio/accesso esterno e collaudo con account cloud reali.

@@ -15,6 +15,7 @@ Apri **Collegamenti → Collega un cloud**, scegli il provider e un nome riconos
 | S3 | Access key, secret key, regione e, per servizi compatibili, endpoint HTTPS |
 | WebDAV | URL HTTPS del servizio, utente, password; vendor `other`, `nextcloud`, `owncloud` o `sharepoint` |
 | SFTP | Host pubblico, porta, utente e password. L'amministratore deve installare la chiave host verificata su ogni worker |
+| iCloud Drive | Apple ID e password principale Apple, poi codice 2FA nel dialogo guidato |
 | Google Drive | Token JSON generato da `rclone authorize drive`; gli eventuali client ID/secret devono corrispondere a quelli usati per ottenerlo |
 
 Per Google Drive esegui sul tuo computer:
@@ -24,6 +25,14 @@ rclone authorize drive
 ```
 
 Completa il consenso nel browser e incolla il JSON del token nel campo dedicato. Trattalo come una password. CloudSync conserva gli aggiornamenti del token scritti da Rclone al termine del lavoro, senza esporlo nell'elenco dei collegamenti. Il login Google direttamente dal sito richiede ancora un'integrazione OAuth dedicata al dominio.
+
+### iCloud Drive e verifica Apple
+
+Dopo aver salvato Apple ID e password, CloudSync avvia un processo Rclone privato e mostra il passaggio richiesto da Apple. Inserisci il codice 2FA ricevuto sul dispositivo fidato. Se Rclone propone altre scelte, la finestra presenta le opzioni disponibili. Non usare password specifiche per app: il backend ufficiale richiede la password dell'account Apple e 2FA.
+
+La procedura scade dopo 10 minuti e non viene ritentata automaticamente per evitare richieste ripetute ad Apple. Puoi riaprirla dal pulsante **Collega / rinnova Apple**. Se un trasferimento sul collegamento è attivo, attendine la fine prima di rinnovare l'accesso. Il codice 2FA viene cifrato nella coda e rimosso dopo la conferma del worker.
+
+L'accesso ai dati iCloud sul Web deve essere consentito nelle impostazioni Apple; se è attiva la Protezione avanzata dei dati, Apple può richiedere un'ulteriore approvazione sul dispositivo. Le richieste dipendono dall'account e dalla versione Rclone. Vedi [documentazione ufficiale iCloud](https://rclone.org/iclouddrive/).
 
 ## 3. Scegli sorgente e destinazione
 

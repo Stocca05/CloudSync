@@ -47,7 +47,7 @@ if [ "$role" = server ]; then
     echo 'Ruolo PostgreSQL cloudsync già esistente: interrompo per non modificare dati preesistenti.' >&2; exit 1
   fi
   runuser -u postgres -- psql -v ON_ERROR_STOP=1 -c "CREATE ROLE cloudsync LOGIN PASSWORD '$db_secret'"
-  runuser -u postgres -- createdb --owner=cloudsync cloudsync
+  runuser -u postgres -- createdb --owner=cloudsync --encoding=UTF8 --template=template0 --locale=C.UTF-8 cloudsync
   cat > /etc/cloudsync/server.env <<ENV
 DATABASE_URL=postgresql+psycopg://cloudsync:$db_secret@127.0.0.1/cloudsync
 ENCRYPTION_KEY=$encryption_key
@@ -77,7 +77,7 @@ if [ "$role" = server ]; then systemctl enable --now cloudsync-api; fi
 systemctl enable --now cloudsync-worker
 if [ "$role" = server ]; then
   for attempt in $(seq 1 45); do
-    if curl -fsS http://127.0.0.1:8080/api/health >/dev/null; then
+    if curl -fsS http://127.0.0.1:8080/api/health >/dev/null 2>&1; then
       echo 'CloudSync attivo sulla porta 8080. Credenziali in /etc/cloudsync/server.env.'
       exit 0
     fi

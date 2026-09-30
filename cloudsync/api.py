@@ -13,7 +13,7 @@ from sqlalchemy import create_engine, delete, func, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
-from .models import Base, ClusterConfig, Job, LoginSession, Node, Remote, Schedule, User
+from .models import AuthAnswer, Base, ClusterConfig, Job, LoginSession, Node, Remote, Schedule, User
 from .providers import PROVIDERS, safe_path, validate_config
 from .scheduler import TERMINAL, bandwidths, claim, lock_scheduler, maintain
 from .security import Vault, digest, hash_password, verify_password
@@ -65,9 +65,16 @@ class ClusterInput(BaseModel):
     max_active_jobs: int = Field(ge=1, le=256)
 
 
+class AuthReply(BaseModel):
+    challenge_id: str = Field(max_length=64)
+    answer: str = Field(max_length=2048)
+
+
 class Heartbeat(BaseModel):
     lease_token: str
     stats: dict = Field(default_factory=dict)
+    challenge: dict | None = None
+    ack_answer: str | None = None
 
 
 class Completion(Heartbeat):
@@ -202,9 +209,17 @@ def create_app(settings=None):
         }
 
     def validate_job(db, spec, user):
-        owned(db, Remote, spec.source_id, user)
+        source_remote = owned(db, Remote, spec.source_id, user)
+        if source_remote.provider == "iclouddrive" and not vault.decrypt(source_remote.encrypted_config).get(
+            "trust_token"
+        ):
+            raise HTTPException(409, "Completa prima la connessione iCloud e il codice 2FA")
         if spec.operation != "list":
-            owned(db, Remote, spec.destination_id, user)
+            destination_remote = owned(db, Remote, spec.destination_id, user)
+            if destination_remote.provider == "iclouddrive" and not vault.decrypt(
+                destination_remote.encrypted_config
+            ).get("trust_token"):
+                raise HTTPException(409, "Completa prima la connessione iCloud di destinazione")
             if spec.source_id == spec.destination_id:
                 raise HTTPException(400, "Scegli due collegamenti distinti")
         if spec.operation == "move" and not spec.confirm_move:
@@ -333,6 +348,61 @@ def create_app(settings=None):
         for schedule in db.scalars(select(Schedule).where(Schedule.user_id == user.id)):
             if remote.id in {schedule.template.get("source_id"), schedule.template.get("destination_id")}:
                 schedule.enabled = False
+        db.commit()
+        return {"ok": True}
+
+    @app.post("/api/remotes/{remote_id}/connect", status_code=201)
+    def connect_remote(remote_id: str, user=Depends(current_user), db: Session = Depends(get_db)):
+        lock_scheduler(db)
+        remote = owned(db, Remote, remote_id, user)
+        if remote.provider != "iclouddrive":
+            raise HTTPException(400, "Questo collegamento non richiede il flusso Apple")
+        previous = db.scalar(
+            select(Job).where(
+                Job.source_id == remote_id,
+                Job.operation == "configure",
+                Job.status.in_(["queued", "running"]),
+            )
+        )
+        if previous:
+            return job_view(previous)
+        busy = db.scalar(
+            select(Job.id)
+            .where((Job.source_id == remote_id) | (Job.destination_id == remote_id), Job.status == "running")
+            .limit(1)
+        )
+        if busy:
+            raise HTTPException(
+                409, "Attendi la fine dei trasferimenti su questo collegamento prima di ricollegarlo"
+            )
+        job = Job(user_id=user.id, source_id=remote_id, operation="configure", max_attempts=1, priority=2)
+        db.add(job)
+        db.commit()
+        return job_view(job)
+
+    @app.post("/api/jobs/{job_id}/answer")
+    def answer_challenge(
+        job_id: str, data: AuthReply, user=Depends(current_user), db: Session = Depends(get_db)
+    ):
+        lock_scheduler(db)
+        job = owned(db, Job, job_id, user)
+        challenge = job.result.get("challenge", {})
+        if (
+            job.operation != "configure"
+            or job.status != "running"
+            or challenge.get("id") != data.challenge_id
+        ):
+            raise HTTPException(409, "Richiesta scaduta. Attendi il nuovo passaggio o riavvia la connessione")
+        if db.get(AuthAnswer, job_id):
+            raise HTTPException(409, "Risposta già inviata: attendi la verifica")
+        db.add(
+            AuthAnswer(
+                job_id=job_id,
+                answer_id=secrets.token_hex(16),
+                challenge_id=data.challenge_id,
+                encrypted_value=vault.encrypt({"answer": data.answer}),
+            )
+        )
         db.commit()
         return {"ok": True}
 
@@ -555,8 +625,33 @@ def create_app(settings=None):
             if isinstance(data.stats.get(k), (int, float))
         }
         node.last_seen = time.time()
+        answer = db.get(AuthAnswer, job.id)
+        if answer and data.ack_answer == answer.answer_id:
+            db.delete(answer)
+            db.flush()
+            answer = None
+        if job.operation == "configure" and data.challenge is not None:
+            challenge = data.challenge
+            if challenge:
+                # Only a small UI schema is persisted; no raw config state or provider credentials.
+                safe = {key: str(challenge.get(key, ""))[:3000] for key in ["id", "name", "help"]}
+                safe["secret"] = bool(challenge.get("secret", True))
+                safe["examples"] = [
+                    {"value": str(e.get("value", ""))[:100], "label": str(e.get("label", ""))[:200]}
+                    for e in challenge.get("examples", [])[:10]
+                    if isinstance(e, dict)
+                ]
+                job.result = {"challenge": safe}
+            else:
+                job.result = {}
         db.flush()
         result = {"cancel": job.cancel_requested, "bandwidth_bps": bandwidths(db)[job.id]}
+        if answer and job.operation == "configure":
+            result["answer"] = {
+                "id": answer.answer_id,
+                "challenge_id": answer.challenge_id,
+                **vault.decrypt(answer.encrypted_value),
+            }
         db.commit()
         return result
 
@@ -569,6 +664,7 @@ def create_app(settings=None):
             for k in ["bytes", "totalBytes", "speed", "eta", "transfers", "checks", "errors"]
             if isinstance(data.stats.get(k), (int, float))
         }
+        db.execute(delete(AuthAnswer).where(AuthAnswer.job_id == job.id))
         job.result = data.result
         job.error = data.error
         job.status = "cancelled" if data.cancelled else ("completed" if data.success else "failed")
@@ -583,12 +679,21 @@ def create_app(settings=None):
             if remote_id not in {job.source_id, job.destination_id}:
                 continue
             remote = db.get(Remote, remote_id)
-            if not remote.enabled or update.get("revision") != remote.revision or remote.provider != "drive":
+            if not remote.enabled or update.get("revision") != remote.revision:
                 continue
             config = vault.decrypt(remote.encrypted_config)
-            token = update.get("token")
-            if isinstance(token, str) and len(token) < 16000:
-                config["token"] = token
+            allowed = (
+                ["token"]
+                if remote.provider == "drive"
+                else (["cookies", "trust_token", "client_id"] if remote.provider == "iclouddrive" else [])
+            )
+            changed = False
+            for key in allowed:
+                value = update.get(key)
+                if isinstance(value, str) and len(value) < 64000 and value != config.get(key):
+                    config[key] = value
+                    changed = True
+            if changed:
                 remote.encrypted_config = vault.encrypt(config)
                 remote.revision += 1
         db.commit()

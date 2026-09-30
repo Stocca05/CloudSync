@@ -100,3 +100,13 @@ class ClusterConfig(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
     global_bps: Mapped[int] = mapped_column(Integer)
     max_active_jobs: Mapped[int] = mapped_column(Integer)
+
+
+class AuthAnswer(Base):
+    """Transient encrypted answer, acknowledged only by the current job lease holder."""
+
+    __tablename__ = "auth_answers"
+    job_id: Mapped[str] = mapped_column(ForeignKey("jobs.id", ondelete="CASCADE"), primary_key=True)
+    answer_id: Mapped[str] = mapped_column(String(32))
+    challenge_id: Mapped[str] = mapped_column(String(64))
+    encrypted_value: Mapped[str] = mapped_column(Text)

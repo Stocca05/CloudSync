@@ -65,3 +65,4 @@ artifacts/
 *.sqlite*
 playwright-report/
 test-results/
+release/

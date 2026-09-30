@@ -6,9 +6,9 @@ import secrets
 import time
 from collections import Counter
 
-from sqlalchemy import select, text
+from sqlalchemy import delete, select, text
 
-from .models import ClusterConfig, Job, Node, Remote, Schedule, User
+from .models import AuthAnswer, ClusterConfig, Job, Node, Remote, Schedule, User
 
 ACTIVE = ("running",)
 TERMINAL = ("completed", "failed", "cancelled")
@@ -27,6 +27,7 @@ def maintain(db, now=None):
             if job.cancel_requested
             else ("queued" if job.attempts < job.max_attempts else "failed")
         )
+        db.execute(delete(AuthAnswer).where(AuthAnswer.job_id == job.id))
         job.error = "Worker non raggiungibile: esecuzione interrotta"
         job.lease_token = None
         job.lease_until = None
@@ -95,6 +96,8 @@ def claim(db, node, lease_seconds):
     job = db.scalar(query.order_by(User.last_dispatch, Job.priority.desc(), Job.created).limit(1))
     if not job:
         return None
+    db.execute(delete(AuthAnswer).where(AuthAnswer.job_id == job.id))
+    job.result = {}
     job.status = "running"
     job.node_id = node.id
     job.lease_token = secrets.token_hex(24)

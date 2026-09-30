@@ -70,7 +70,7 @@ La 0.2 crea lo schema iniziale. **`create_all` non aggiorna colonne di un databa
 
 Per Docker: `./start` ricostruisce l'immagine e rialza i servizi senza cancellare il volume. Non usare `docker compose down -v` come comando di aggiornamento.
 
-Per nativo: sincronizzare il codice in `/opt/cloudsync`, eseguire `/opt/cloudsync-bootstrap/bin/uv sync --frozen --no-dev` con `UV_PYTHON_INSTALL_DIR=/opt/cloudsync-python`, poi `./start`.
+Per nativo: sincronizzare il codice in `/opt/cloudsync`, eseguire `/opt/cloudsync-bootstrap/bin/uv sync --frozen --no-dev` con `UV_PYTHON_INSTALL_DIR=/opt/cloudsync-python`, poi `systemctl restart cloudsync-api cloudsync-worker` e `./start` per la verifica di salute.
 
 ## Se qualcosa non parte
 
@@ -88,3 +88,16 @@ Per nativo: sincronizzare il codice in `/opt/cloudsync`, eseguire `/opt/cloudsyn
 ## Dati e amministrazione
 
 La cronologia cresce nel database: prevedere monitoraggio del disco e una futura politica di conservazione. La 0.2 non offre ancora eliminazione della cronologia, recupero password self-service, 2FA applicativa o un audit completo delle azioni amministrative. Gli account restano volutamente semplici come richiesto.
+
+### Aggiornamento nativo da una release estratta
+
+Per questa ricostruzione è disponibile un helper che salva prima applicazione, database e segreti:
+
+```bash
+cd /root/cloudsync-nuova-release
+./deploy/update-native.sh
+```
+
+Usare `--retire-legacy` soltanto per disattivare il vecchio container Docker chiamato esattamente `cloudsync` con immagine `cloudsync:latest`, dopo l'avvio verificato del nuovo servizio. I dati della vecchia versione non vengono cancellati.
+
+L'aggiornamento iCloud aggiunge la tabella `auth_answers` senza modificare le colonne esistenti. Viene creata automaticamente dal nuovo backend. Il backup resta comunque richiesto dall'helper.

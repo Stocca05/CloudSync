@@ -3,8 +3,16 @@ set -euo pipefail
 cd "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 if [ -f /etc/cloudsync/role ]; then
   if [ "$(id -u)" != 0 ]; then echo 'Usa sudo ./start nel container.' >&2; exit 1; fi
-  if [ "$(cat /etc/cloudsync/role)" = server ]; then systemctl restart cloudsync-api; fi
-  systemctl restart cloudsync-worker
+  if [ "$(cat /etc/cloudsync/role)" = server ]; then systemctl enable --now cloudsync-api; fi
+  systemctl enable --now cloudsync-worker
+  if [ "$(cat /etc/cloudsync/role)" = server ]; then
+    service_ready=false
+    for attempt in $(seq 1 45); do
+      if curl -fsS http://127.0.0.1:8080/api/health >/dev/null 2>&1; then service_ready=true; break; fi
+      sleep 1
+    done
+    if [ "$service_ready" != true ]; then echo 'API non pronta: consulta journalctl -u cloudsync-api.' >&2; exit 1; fi
+  fi
   echo 'Servizi CloudSync avviati con systemd.'
   exit 0
 fi
