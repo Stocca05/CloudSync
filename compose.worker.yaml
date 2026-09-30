@@ -1,0 +1,25 @@
+name: cloudsync-worker
+services:
+  worker:
+    build: .
+    image: cloudsync:0.2.0
+    command: [python, -m, cloudsync.worker]
+    restart: unless-stopped
+    init: true
+    read_only: true
+    tmpfs: ["/tmp:size=128m,mode=1777"]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    environment:
+      CONTROL_URL: ${CONTROL_URL:?Set the HTTPS control-plane URL}
+      WORKER_TOKEN: ${WORKER_TOKEN:?Create a node in the admin panel}
+      WORKER_SLOTS: ${WORKER_SLOTS:-2}
+      SFTP_KNOWN_HOSTS: /etc/cloudsync/known_hosts
+    volumes: ["./runtime/known_hosts:/etc/cloudsync/known_hosts:ro"]
+    stop_grace_period: 45s
+    mem_limit: 1g
+    cpus: 2
+    pids_limit: 256
+    logging:
+      driver: json-file
+      options: {max-size: 10m, max-file: "3"}

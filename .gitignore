@@ -57,3 +57,12 @@ out/
 # CloudSync Runtime
 config/rclone.conf
 data/
+
+# Distributed runtime / verification artifacts
+runtime/
+artifacts/
+*.db
+*.sqlite*
+playwright-report/
+test-results/
+release/

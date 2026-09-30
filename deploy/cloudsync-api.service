@@ -1,0 +1,22 @@
+[Unit]
+Description=CloudSync control plane
+After=network-online.target postgresql.service
+Wants=network-online.target
+[Service]
+User=cloudsync
+Group=cloudsync
+WorkingDirectory=/opt/cloudsync
+EnvironmentFile=/etc/cloudsync/server.env
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/opt/cloudsync/.venv/bin/uvicorn cloudsync.api:create_app --factory --host 0.0.0.0 --port 8080 --no-access-log
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+UMask=0077
+MemoryMax=384M
+TasksMax=256
+[Install]
+WantedBy=multi-user.target
