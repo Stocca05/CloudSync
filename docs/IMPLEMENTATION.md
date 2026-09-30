@@ -1,7 +1,7 @@
 # CloudSync — ricostruzione distribuita
 
 ## Obiettivo
-Un servizio web persistente per utenti con username/password semplici, collegamenti personali e trasferimenti Rclone eseguiti su uno o più nodi. Avvio con `./start`. Destinazione: Proxmox, topologia da confermare con l'operatore.
+Un servizio web persistente per utenti con username/password semplici, collegamenti personali e trasferimenti Rclone eseguiti su uno o più nodi. Avvio con `./start`. Destinazione: container Proxmox con API, PostgreSQL e worker locali; ulteriori worker possono essere aggiunti su altri nodi.
 
 ## Decisioni
 - PostgreSQL è la fonte autorevole per utenti, sessioni, segreti cifrati, coda, lease e worker.
@@ -25,8 +25,8 @@ Un servizio web persistente per utenti con username/password semplici, collegame
 Isolamento tra due utenti; due worker concorrenti; revoca lease; annullamento; riavvio; allocazione banda; copia reale con confronto hash; avvio completo da directory pulita; nessun segreto in Git.
 
 ## Distribuzione e stato
-Il proprietario ha indicato un container LXC Debian 12, accessibile via SSH come root. Installazione nativa effettuata; API 0.2.0 e worker verificati attivi, endpoint salute positivo prima del cambio di permessi della sessione. Dati legacy salvati prima dell'installazione.
+Il 30 settembre 2026 la versione con iCloud è stata distribuita nel container LXC Debian 12 indicato dal proprietario. API, worker e tunnel Cloudflare sono gestiti da systemd e abilitati all’avvio. La vecchia istanza Docker è stata fermata dopo la verifica di salute; dati legacy e database sono conservati nei backup del container.
 
-La restrizione di rete successiva impedisce nuovi collegamenti SSH, accesso Docker e test con socket locali. Gli aggiornamenti iCloud successivi sono quindi locali e richiedono una nuova distribuzione quando la sessione avrà accesso di rete. L'esito dell'ultimo collaudo remoto multiworker non è stato recuperato; non viene dichiarato riuscito.
+L’accesso SSH e la rete sono nuovamente disponibili. La suite completa comprende 19 test passati, inclusi PostgreSQL concorrente e copia reale Rclone. Il collaudo browser verifica login, collegamenti, amministrazione e layout mobile.
 
-Provider richiesti: Google Drive, S3, SFTP, WebDAV e iCloud. Restano da definire dominio/accesso esterno e collaudo con account cloud reali.
+Provider richiesti: Google Drive, S3, SFTP, WebDAV e iCloud. Il tunnel pubblico iniziale è temporaneo; per un indirizzo stabile serve un tunnel associato al proprio dominio Cloudflare. I collegamenti cloud richiedono ancora il collaudo con account reali.

@@ -55,11 +55,17 @@ Il test avvia un'app temporanea su loopback e usa Chrome headless. Prova login, 
 
 ## Da non confondere con verifiche già concluse
 
-Le integrazioni cloud richiedono ancora account reali del proprietario per un collaudo specifico. Il test browser non autentica Google Drive. La procedura iCloud è verificata con risposte Rclone/Apple simulate, ma non ancora con un account Apple reale. OAuth web Google diretto non è implementato. HTTPS pubblico, egress firewall e prova su un secondo container Proxmox devono essere verificati nella topologia definitiva.
+Le integrazioni cloud richiedono ancora account reali del proprietario per un collaudo specifico. Il test browser non autentica Google Drive. La procedura iCloud è verificata con risposte Rclone/Apple simulate, ma non ancora con un account Apple reale. OAuth web Google diretto non è implementato. Egress firewall e prova su un secondo container Proxmox devono essere verificati nella topologia definitiva.
 
 
-## Aggiornamento iCloud e restrizioni della sessione
+## Aggiornamento iCloud e verifica finale
 
 La suite aggiunge due test per la configurazione `iclouddrive`: isolamento della richiesta 2FA, cifratura della risposta, conferma di ricezione e protocollo `config/create → config/update → config/get`. Il binario Rclone 1.75.1 installato espone i campi `apple_id`, `password`, `trust_token`, `cookies` e `client_id` attesi.
 
-Dopo il cambio delle restrizioni dell'ambiente di sviluppo, l'esecuzione completa è risultata: **17 test passati, 1 test PostgreSQL non eseguito senza URL, 1 test di copia reale bloccato dal divieto di aprire socket localhost**. La precedente suite di 17 test, inclusi PostgreSQL e copia reale, era passata prima del cambio. Non si tratta di un collaudo reale del nuovo flusso Apple.
+Ripristinato l’accesso di rete, il 30 settembre 2026 la suite completa è passata: **19 test, inclusi PostgreSQL e copia reale Rclone**. Il collaudo Chrome è passato senza errori JavaScript. Queste verifiche non sostituiscono un collaudo del flusso Apple con un account reale.
+
+## Container di destinazione
+
+Il collaudo `scripts/deployment_smoke.py` eseguito sul container Debian 12 usa due utenti, due processi worker reali e quattro copie da 2 MiB con confronto SHA256. Il worker temporaneo viene interrotto durante un lavoro: la coda lo recupera e il worker locale completa la copia. Il test rimuove soltanto le proprie fixture. Il servizio worker dispone di scrittura in `/var/lib/cloudsync`, mantenendo il resto del filesystem protetto. I due worker di questa prova condividono il container: non è una verifica multinodo fisica.
+
+Il collaudo su loopback richiede temporaneamente `COOKIE_SECURE=false`; completarlo prima di attivare i cookie HTTPS per l’accesso pubblico.

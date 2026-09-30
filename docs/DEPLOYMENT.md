@@ -111,3 +111,20 @@ Installa le chiavi host SFTP verificate in `/etc/cloudsync/known_hosts` (nativo)
 I campi URL/host vengono validati sia dall'API sia dal worker: niente loopback, LAN o metadata IP nelle configurazioni pubbliche. Questo non è una difesa completa contro DNS rebinding: per esposizione a utenti non fidati, configura anche firewall egress sui worker, consentendo il control plane e impedendo l'accesso alle reti di gestione/metadata. La rete del control plane non dovrebbe essere utilizzata come rete generica per i trasferimenti.
 
 Non servono porte in ingresso sui worker. Il loro Rclone RC ascolta solo su loopback, con una password casuale per esecuzione.
+
+## Link Cloudflare temporaneo
+
+Per un accesso immediato senza dominio, è disponibile `deploy/cloudsync-tunnel.service`. Richiede `cloudflared` in `/usr/local/bin/cloudflared`. Installa l'unità nel container e abilitala:
+
+```bash
+cp deploy/cloudsync-tunnel.service /etc/systemd/system/
+systemctl daemon-reload
+systemctl enable --now cloudsync-tunnel
+journalctl -u cloudsync-tunnel --no-pager | grep 'https://.*trycloudflare.com'
+```
+
+Imposta `COOKIE_SECURE=true` nel file `/etc/cloudsync/server.env` e riavvia `cloudsync-api` per usare cookie di accesso solo su HTTPS. Da quel momento esegui il login attraverso il link HTTPS, non tramite l'IP HTTP locale.
+
+L'unità mantiene il processo attivo dopo la chiusura SSH e al riavvio del container. L'indirizzo generato può cambiare quando `cloudflared` riparte: per un indirizzo permanente serve un tunnel associato al tuo account e dominio Cloudflare. La registrazione semplice dell'app rimane disponibile a chi raggiunge il link.
+
+Fonte: [Cloudflare Quick Tunnels](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/).

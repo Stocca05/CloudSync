@@ -12,6 +12,9 @@ if [ -f /etc/cloudsync/role ]; then
       sleep 1
     done
     if [ "$service_ready" != true ]; then echo 'API non pronta: consulta journalctl -u cloudsync-api.' >&2; exit 1; fi
+    if [ -f /etc/systemd/system/cloudsync-tunnel.service ]; then
+      systemctl enable --now cloudsync-tunnel
+    fi
   fi
   echo 'Servizi CloudSync avviati con systemd.'
   exit 0
