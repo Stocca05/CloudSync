@@ -170,3 +170,45 @@ def test_full_icloud_conversation_protocol(client, app, monkeypatch):
         assert saved["password"] == "fake-password"
         assert db.get(AuthAnswer, job["id"]) is None
     assert "/config/create" in calls and "/config/update" in calls
+
+
+def test_continuation_preserves_rclone_session_and_password():
+    conversation = icloud_auth.Conversation("apple", {"password": "x" * 40, "cookies": "stale"})
+    question = conversation.receive({"State": "2fa_do", "Option": {"Name": "config_2fa"}})
+    assert {"value": "sms", "label": "Invia un codice via SMS"} in question["examples"]
+    endpoint, request = conversation.answer("123456")
+    assert endpoint == "config/update"
+    # Never overwrite newly issued cookies, obscure password again or reset Apple session.
+    assert request["parameters"] == {}
+    assert request["opt"]["state"] == "2fa_do"
+
+
+def test_apple_errors_are_specific_without_leaking_provider_data():
+    code, message = icloud_auth.apple_error(
+        "authSrpComplete: sign in failed: Incorrect username or password secret=LEAK"
+    )
+    assert code == "credentials" and "LEAK" not in message
+    assert icloud_auth.apple_error("verification code invalid")[0] == "verification"
+    assert icloud_auth.apple_error("Missing PCS cookies from the request")[0] == "web_access"
+    assert icloud_auth.apple_error("opaque body secret=LEAK")[0] == "provider"
+
+
+def test_update_apple_credentials_ownership(client, app):
+    login(client)
+    data = {
+        "name": "Apple",
+        "provider": "iclouddrive",
+        "config": {"apple_id": "example@icloud.com", "password": "old"},
+    }
+    remote = client.post("/api/remotes", json=data).json()
+    data["config"]["password"] = "new"
+    assert client.patch("/api/remotes/" + remote["id"], json=data).status_code == 200
+    with app.state.factory() as db:
+        saved = db.get(Remote, remote["id"])
+        assert app.state.vault.decrypt(saved.encrypted_config)["password"] == "new"
+        assert saved.revision == 2
+    client.post("/api/remotes/" + remote["id"] + "/connect")
+    assert client.patch("/api/remotes/" + remote["id"], json=data).status_code == 409
+    client.post("/api/auth/register", json={"username": "friend", "password": "x"})
+    login(client, "friend", "x")
+    assert client.patch("/api/remotes/" + remote["id"], json=data).status_code == 404

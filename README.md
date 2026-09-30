@@ -101,3 +101,7 @@ docs/          Guide operative, architettura e verifica
 - [Verifiche](docs/TESTING.md): cosa è stato provato e cosa resta da collaudare.
 
 Costruito su [Rclone](https://rclone.org/), [FastAPI](https://fastapi.tiangolo.com/) e [PostgreSQL](https://www.postgresql.org/).
+
+### Accessi cloud e amministrazione
+
+[Google con Rclone, iCloud con 2FA e priorità dei processi](docs/CLOUD-LOGIN.md).

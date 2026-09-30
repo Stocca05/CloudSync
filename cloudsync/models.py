@@ -110,3 +110,13 @@ class AuthAnswer(Base):
     answer_id: Mapped[str] = mapped_column(String(32))
     challenge_id: Mapped[str] = mapped_column(String(64))
     encrypted_value: Mapped[str] = mapped_column(Text)
+
+
+class GoogleAuthorization(Base):
+    __tablename__ = "google_authorizations"
+    state_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    session_hash: Mapped[str] = mapped_column(String(64), index=True)
+    name: Mapped[str] = mapped_column(String(80))
+    encrypted_data: Mapped[str] = mapped_column(Text)
+    expires: Mapped[float] = mapped_column(Float, index=True)

@@ -59,7 +59,11 @@ def bandwidths(db) -> dict[str, int]:
         return {}
     cfg = db.get(ClusterConfig, 1)
     counts = Counter(j.user_id for j in jobs)
-    nodes = Counter(j.node_id for j in jobs)
+    nodes = Counter()
+    user_weights = Counter()
+    for job in jobs:
+        nodes[job.node_id] += job.priority + 1
+        user_weights[job.user_id] += job.priority + 1
     users = {u.id: u for u in db.scalars(select(User).where(User.id.in_(counts)))}
     total_weight = sum(u.weight for u in users.values())
     result = {}
@@ -69,7 +73,13 @@ def bandwidths(db) -> dict[str, int]:
         if user.bandwidth_bps:
             user_share = min(user_share, user.bandwidth_bps)
         node = db.get(Node, job.node_id)
-        result[job.id] = max(1, min(user_share // counts[user.id], node.bandwidth_bps // nodes[node.id]))
+        result[job.id] = max(
+            1,
+            min(
+                user_share * (job.priority + 1) // user_weights[user.id],
+                node.bandwidth_bps * (job.priority + 1) // nodes[node.id],
+            ),
+        )
     return result
 
 

@@ -69,3 +69,7 @@ Ripristinato l’accesso di rete, il 30 settembre 2026 la suite completa è pass
 Il collaudo `scripts/deployment_smoke.py` eseguito sul container Debian 12 usa due utenti, due processi worker reali e quattro copie da 2 MiB con confronto SHA256. Il worker temporaneo viene interrotto durante un lavoro: la coda lo recupera e il worker locale completa la copia. Il test rimuove soltanto le proprie fixture. Il servizio worker dispone di scrittura in `/var/lib/cloudsync`, mantenendo il resto del filesystem protetto. I due worker di questa prova condividono il container: non è una verifica multinodo fisica.
 
 Il collaudo su loopback richiede temporaneamente `COOKIE_SECURE=false`; completarlo prima di attivare i cookie HTTPS per l’accesso pubblico.
+
+## Accessi cloud e amministrazione (aggiornamento)
+
+28 test passati con PostgreSQL: aggiunte prove di OAuth Google (state/sessione/PKCE, scadenza e replay), associazione Rclone monouso e revoca al logout, conservazione della sessione Apple, aggiornamento credenziali con isolamento, monitoraggio amministrativo e variazione delle quote per priorità dei lavori. Browser desktop/mobile: nessun campo token per Google, creazione collegamento S3, modifica priorità, limiti e arruolamento nodo. Avvio reale `rclone authorize drive` verificato fino al redirect Google con client condiviso e callback locale; consenso Google e accesso Apple reale restano da completare con il titolare.

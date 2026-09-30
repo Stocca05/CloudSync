@@ -13,6 +13,7 @@ from sqlalchemy import create_engine, delete, func, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
+from .google_auth import install_google_routes
 from .models import AuthAnswer, Base, ClusterConfig, Job, LoginSession, Node, Remote, Schedule, User
 from .providers import PROVIDERS, safe_path, validate_config
 from .scheduler import TERMINAL, bandwidths, claim, lock_scheduler, maintain
@@ -58,6 +59,10 @@ class NodeInput(BaseModel):
     name: str = Field(pattern=r"^[a-zA-Z0-9_-]{1,64}$")
     slots: int = Field(default=2, ge=1, le=32)
     bandwidth_bps: int = Field(default=52428800, ge=65536, le=2000000000)
+
+
+class JobPriority(BaseModel):
+    priority: int = Field(ge=0, le=2)
 
 
 class ClusterInput(BaseModel):
@@ -163,6 +168,8 @@ def create_app(settings=None):
         if not user.admin:
             raise HTTPException(403, "Operazione riservata all'amministratore")
         return user
+
+    install_google_routes(app, settings, vault, get_db, current_user)
 
     def worker(request: Request, db: Session = Depends(get_db)):
         bearer = request.headers.get("authorization", "").removeprefix("Bearer ")
@@ -325,6 +332,33 @@ def create_app(settings=None):
             user_id=user.id, name=data.name, provider=data.provider, encrypted_config=vault.encrypt(config)
         )
         db.add(remote)
+        db.commit()
+        return {"id": remote.id, "name": remote.name, "provider": remote.provider}
+
+    @app.patch("/api/remotes/{remote_id}")
+    def update_apple(
+        remote_id: str, data: RemoteInput, user=Depends(current_user), db: Session = Depends(get_db)
+    ):
+        lock_scheduler(db)
+        remote = owned(db, Remote, remote_id, user)
+        if remote.provider != "iclouddrive" or data.provider != "iclouddrive":
+            raise HTTPException(400, "Aggiornamento riservato alle credenziali Apple")
+        if db.scalar(
+            select(Job.id)
+            .where(
+                (Job.source_id == remote_id) | (Job.destination_id == remote_id),
+                Job.status.in_(["queued", "running"]),
+            )
+            .limit(1)
+        ):
+            raise HTTPException(409, "Attendi o annulla i lavori di questo collegamento prima di aggiornarlo")
+        try:
+            config = validate_config(data.provider, data.config)
+        except (ValueError, TypeError) as exc:
+            raise HTTPException(400, str(exc)) from exc
+        remote.encrypted_config = vault.encrypt(config)
+        remote.revision += 1
+        remote.name = data.name
         db.commit()
         return {"id": remote.id, "name": remote.name, "provider": remote.provider}
 
@@ -500,6 +534,48 @@ def create_app(settings=None):
     def delete_schedule(schedule_id: str, user=Depends(current_user), db: Session = Depends(get_db)):
         lock_scheduler(db)
         db.delete(owned(db, Schedule, schedule_id, user))
+        db.commit()
+        return {"ok": True}
+
+    @app.get("/api/admin/jobs")
+    def admin_jobs(offset: int = 0, status: str = "", user=Depends(admin), db: Session = Depends(get_db)):
+        query = select(Job, User.username).join(User, Job.user_id == User.id)
+        if status:
+            query = query.where(Job.status == status)
+        rows = db.execute(query.order_by(Job.created.desc()).offset(max(0, offset)).limit(100)).all()
+        rates = bandwidths(db)
+        items = []
+        for job, username in rows:
+            view = job_view(job)
+            # Administrative monitoring does not expose authentication challenges.
+            view["result"] = {}
+            view.update(username=username, assigned_bps=rates.get(job.id, 0))
+            items.append(view)
+        return {"items": items, "offset": max(0, offset), "has_more": len(items) == 100}
+
+    @app.patch("/api/admin/jobs/{job_id}")
+    def admin_priority(job_id: str, data: JobPriority, user=Depends(admin), db: Session = Depends(get_db)):
+        lock_scheduler(db)
+        job = db.get(Job, job_id)
+        if not job:
+            raise HTTPException(404, "Lavoro non trovato")
+        if job.status in TERMINAL:
+            raise HTTPException(409, "Il lavoro è già terminato")
+        job.priority = data.priority
+        db.commit()
+        return {"ok": True}
+
+    @app.post("/api/admin/jobs/{job_id}/cancel")
+    def admin_cancel(job_id: str, user=Depends(admin), db: Session = Depends(get_db)):
+        lock_scheduler(db)
+        job = db.get(Job, job_id)
+        if not job:
+            raise HTTPException(404, "Lavoro non trovato")
+        if job.status not in TERMINAL:
+            job.cancel_requested = True
+            if job.status == "queued":
+                job.status = "cancelled"
+                job.finished = time.time()
         db.commit()
         return {"ok": True}
 

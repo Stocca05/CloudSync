@@ -50,15 +50,29 @@ with tempfile.TemporaryDirectory() as tmp:
             page.screenshot(path=str(artifacts / "dashboard-desktop.png"), full_page=True)
             page.locator("[data-page=remotes]").click()
             page.locator("#add-remote").click()
-            page.locator("#remote-form input[name=name]").fill("Drive personale")
+            page.locator("#remote-form input[name=name]").fill("Archivio S3")
             page.locator("#provider").select_option("drive")
-            page.locator("#provider-fields textarea").fill(
-                '{"access_token":"ui-fixture","refresh_token":"ui-fixture"}'
-            )
+            assert page.locator("#provider-fields input, #provider-fields textarea").count() == 0
+            assert page.get_by_role("button", name="Accedi con Google").is_enabled()
+            page.locator("#provider").select_option("s3")
+            page.locator("input[name=access_key_id]").fill("ui-fixture")
+            page.locator("input[name=secret_access_key]").fill("ui-fixture")
             page.get_by_role("button", name="Salva collegamento").click()
             page.locator("#remote-dialog").wait_for(state="hidden")
-            assert page.locator("#remotes").inner_text().find("Drive personale") >= 0
+            assert "Archivio S3" in page.locator("#remotes").inner_text()
+            remotes = page.request.get(f"http://127.0.0.1:{port}/api/remotes").json()
+            response = page.request.post(
+                f"http://127.0.0.1:{port}/api/jobs",
+                headers={"X-CloudSync-Request": "1"},
+                data={"operation": "list", "source_id": remotes[0]["id"]},
+            )
+            assert response.status == 201
             page.locator("[data-page=admin]").click()
+            page.locator("#admin-jobs select").first.select_option("2")
+            page.get_by_role("button", name="Applica priorità").click()
+            page.wait_for_timeout(300)
+            jobs = page.request.get(f"http://127.0.0.1:{port}/api/admin/jobs").json()
+            assert jobs["items"][0]["priority"] == 2
             page.locator("#global-bandwidth").fill("30")
             page.get_by_role("button", name="Salva limiti").click()
             page.locator("#add-node").click()

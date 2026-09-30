@@ -13,6 +13,9 @@ class Settings:
     allow_registration: bool = field(
         default_factory=lambda: os.environ.get("ALLOW_REGISTRATION", "true") == "true"
     )
+    google_client_id: str = field(default_factory=lambda: os.environ.get("GOOGLE_CLIENT_ID", ""))
+    google_client_secret: str = field(default_factory=lambda: os.environ.get("GOOGLE_CLIENT_SECRET", ""))
+    public_url: str = field(default_factory=lambda: os.environ.get("PUBLIC_URL", ""))
     session_seconds: int = 7 * 86400
     lease_seconds: int = 90
     global_bps: int = field(default_factory=lambda: int(os.environ.get("GLOBAL_BPS", "52428800")))

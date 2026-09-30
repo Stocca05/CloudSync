@@ -28,7 +28,7 @@ PROVIDERS = {
         "required": ["url", "user", "pass"],
     },
     "drive": {
-        "label": "Google Drive · token Rclone",
+        "label": "Google Drive",
         "fields": ["token", "client_id", "client_secret", "root_folder_id"],
         "required": ["token"],
     },
