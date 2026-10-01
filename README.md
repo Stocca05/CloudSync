@@ -150,19 +150,75 @@ CloudSync includes a smart, single-command launcher that detects your environmen
 
 ---
 
-### Option 2: Docker Compose
+### Option 2: Docker & Docker Compose
+
+CloudSync offre tre modalità di deployment Docker per adattarsi a qualsiasi esigenza infrastrutturale:
+
+#### A) Modalità Standard Multi-Container (PostgreSQL + API + Worker)
+Ideale per installazioni su server di produzione dedicati con database PostgreSQL ad alta affidabilità e worker scalabili:
+
+1. **Clona il repository e prepara l'ambiente:**
+   ```bash
+   git clone https://github.com/Stocca05/CloudSync.git
+   cd CloudSync
+   cp .env.example .env
+   # Modifica le password e le chiavi segrete in .env (oppure lancia ./start per generarle in automatico)
+   nano .env
+   ```
+
+2. **Avvia il cluster:**
+   ```bash
+   docker compose up -d --build
+   ```
+
+3. **Come funziona l'architettura dei servizi (`compose.yaml`):**
+   - **`db`** (`postgres:17.9`): database relazionale con lock advisory transazionali e volume persistente `database:/var/lib/postgresql/data`.
+   - **`api`** (`cloudsync:0.2.0`): server FastAPI + interfaccia Web Glassmorphic esposta su `http://localhost:8080`.
+   - **`worker`** (`cloudsync:0.2.0`): processo worker non-root isolato che preleva i job dalla coda ed esegue i flussi Rclone.
+
+---
+
+#### B) Modalità All-in-One Super Leggera (1 Solo Container con SQLite)
+Ideale per **NAS (Synology, QNAP, Unraid, TrueNAS)**, mini-PC o uso personale a **bassissimo consumo di RAM (~80-120 MB)**, senza bisogno di un database PostgreSQL esterno:
+
+- **Avvio rapido con Docker Compose (`compose.aio.yaml`):**
+  ```bash
+  docker compose -f compose.aio.yaml up -d
+  ```
+
+- **Oppure con singolo comando `docker run`:**
+  ```bash
+  docker run -d \
+    --name cloudsync \
+    -p 8080:8000 \
+    -v cloudsync-data:/data \
+    --restart unless-stopped \
+    cloudsync:latest
+  ```
+
+> 💡 **Zero Configurazione Necessaria:** Al primo avvio, il supervisore interno genera automaticamente la chiave di crittografia (`/data/cloudsync.key`), il database SQLite con modalità WAL ad alte prestazioni (`/data/cloudsync.db`) e una password iniziale per l'utente `admin`. La password viene mostrata nei log (`docker logs cloudsync`) e salvata in modo sicuro in `/data/admin.password`.
+
+---
+
+#### C) Modalità Worker Docker Distribuito (Aggiungere Nodi al Cluster)
+Se hai già un server centrale CloudSync attivo e vuoi aggiungere un altro computer, workstation o VPS come nodo di calcolo remoto:
 
 ```bash
-# Clone the repository
-git clone https://github.com/Stocca05/CloudSync.git
-cd CloudSync
-
-# Configure environment
-cp .env.example .env
-
-# Launch services
-docker compose up -d
+docker compose -f compose.worker.yaml up -d
 ```
+*(È sufficiente specificare nel file `compose.worker.yaml` l'indirizzo del server centrale `CONTROL_URL` e il token di autenticazione `WORKER_TOKEN`).*
+
+---
+
+#### 🛠️ Comandi Utili per la Gestione Docker
+
+| Operazione | Comando Docker Compose | Comando Container Singolo |
+| :--- | :--- | :--- |
+| **Visualizzare i log in tempo reale** | `docker compose logs -f` | `docker logs -f cloudsync` |
+| **Verificare lo stato dei container** | `docker compose ps` | `docker ps` |
+| **Riavviare i servizi** | `docker compose restart` | `docker restart cloudsync` |
+| **Fermare l'applicazione** | `docker compose down` | `docker stop cloudsync` |
+| **Aggiornare alla versione più recente** | `git pull && docker compose up -d --build` | `docker pull ... && docker restart ...` |
 
 ---
 
