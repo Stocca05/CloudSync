@@ -51,16 +51,19 @@ class ScheduleInput(BaseModel):
 
 
 class UserPolicy(BaseModel):
-    weight: int = Field(ge=1, le=10)
-    max_jobs: int = Field(ge=1, le=16)
-    bandwidth_bps: int = Field(ge=0, le=2000000000)
+    weight: int = Field(default=1, ge=1, le=10)
+    max_jobs: int = Field(default=2, ge=1, le=16)
+    bandwidth_bps: int = Field(default=0, ge=0, le=2000000000)
     enabled: bool = True
+    admin: bool | None = None
+    password: str | None = None
 
 
 class NodeInput(BaseModel):
-    name: str = Field(pattern=r"^[a-zA-Z0-9_-]{1,64}$")
+    name: str = Field(default="", pattern=r"^[a-zA-Z0-9_-]{0,64}$")
     slots: int = Field(default=2, ge=1, le=32)
     bandwidth_bps: int = Field(default=52428800, ge=65536, le=2000000000)
+    enabled: bool = True
 
 
 class JobPriority(BaseModel):
@@ -547,6 +550,16 @@ def create_app(settings=None):
         db.commit()
         return job_view(job)
 
+    @app.delete("/api/jobs/{job_id}")
+    def delete_job(job_id: str, user=Depends(current_user), db: Session = Depends(get_db)):
+        lock_scheduler(db)
+        job = owned(db, Job, job_id, user)
+        if job.status in {"queued", "running"}:
+            raise HTTPException(400, "Annulla prima il lavoro prima di eliminarlo dalla cronologia")
+        db.delete(job)
+        db.commit()
+        return {"ok": True}
+
     @app.get("/api/schedules")
     def schedules(user=Depends(current_user), db: Session = Depends(get_db)):
         return [
@@ -686,18 +699,69 @@ def create_app(settings=None):
     @app.get("/api/admin/cluster")
     def cluster(user=Depends(admin), db: Session = Depends(get_db)):
         cfg = db.get(ClusterConfig, 1)
+        nodes = list(db.scalars(select(Node)))
+        active_jobs = list(db.scalars(select(Job).where(Job.status == "running")))
+        queued_jobs = list(db.scalars(select(Job).where(Job.status == "queued")))
+        completed_count = db.scalar(select(func.count()).select_from(Job).where(Job.status == "completed")) or 0
+        failed_count = db.scalar(select(func.count()).select_from(Job).where(Job.status == "failed")) or 0
+        total_finished = completed_count + failed_count
+        success_rate = round((completed_count / total_finished * 100), 1) if total_finished > 0 else 100.0
+
+        current_rates = bandwidths(db)
+
+        # Calculate per-node usage
+        node_stats = {}
+        for n in nodes:
+            n_jobs = [j for j in active_jobs if j.node_id == n.id]
+            node_stats[n.id] = {
+                "active_jobs": len(n_jobs),
+                "slots_used_pct": round((len(n_jobs) / max(1, n.slots)) * 100, 1),
+                "current_bps": sum(current_rates.get(j.id, 0) for j in n_jobs),
+            }
+
+        online_nodes_count = sum(1 for n in nodes if n.enabled and (time.time() - n.last_seen < 25))
+        total_active_slots = sum(n.slots for n in nodes if n.enabled and (time.time() - n.last_seen < 25))
+        total_cluster_capacity_bps = sum(n.bandwidth_bps for n in nodes if n.enabled and (time.time() - n.last_seen < 25))
+        current_cluster_bps = sum(
+            j.stats.get("speed", 0) for j in active_jobs if isinstance(j.stats, dict) and "speed" in j.stats
+        )
+
         return {
             "global_bps": cfg.global_bps,
             "max_active_jobs": cfg.max_active_jobs,
+            "total_nodes": len(nodes),
+            "online_nodes": online_nodes_count,
+            "total_active_slots": total_active_slots,
+            "used_slots": len(active_jobs),
+            "queued_jobs": len(queued_jobs),
+            "completed_jobs": completed_count,
+            "failed_jobs": failed_count,
+            "success_rate": success_rate,
+            "current_cluster_bps": current_cluster_bps,
+            "total_cluster_capacity_bps": total_cluster_capacity_bps,
             "nodes": [
                 {
-                    k: getattr(n, k)
-                    for k in ["id", "enabled", "slots", "bandwidth_bps", "last_seen", "version"]
+                    "id": n.id,
+                    "enabled": n.enabled,
+                    "slots": n.slots,
+                    "bandwidth_bps": n.bandwidth_bps,
+                    "last_seen": n.last_seen,
+                    "online": (time.time() - n.last_seen < 25) and n.enabled,
+                    "version": n.version,
+                    "active_jobs": node_stats.get(n.id, {}).get("active_jobs", 0),
+                    "slots_used_pct": node_stats.get(n.id, {}).get("slots_used_pct", 0),
+                    "current_bps": node_stats.get(n.id, {}).get("current_bps", 0),
                 }
-                for n in db.scalars(select(Node))
+                for n in nodes
             ],
-            "users": [user_view(u) for u in db.scalars(select(User).order_by(User.created))],
-            "rates": bandwidths(db),
+            "users": [
+                {
+                    **user_view(u),
+                    "active_jobs_count": sum(1 for j in active_jobs if j.user_id == u.id),
+                }
+                for u in db.scalars(select(User).order_by(User.created))
+            ],
+            "rates": current_rates,
         }
 
     @app.patch("/api/admin/cluster")
@@ -717,8 +781,14 @@ def create_app(settings=None):
             raise HTTPException(404)
         if target.id == user.id and not data.enabled:
             raise HTTPException(400, "Non puoi disattivare il tuo account")
-        for key, value in data.model_dump().items():
-            setattr(target, key, value)
+        target.weight = data.weight
+        target.max_jobs = data.max_jobs
+        target.bandwidth_bps = data.bandwidth_bps
+        target.enabled = data.enabled
+        if data.admin is not None and target.id != user.id:
+            target.admin = data.admin
+        if data.password and len(data.password) >= 6:
+            target.password_hash = hash_password(data.password)
         if not data.enabled:
             db.execute(delete(LoginSession).where(LoginSession.user_id == target.id))
             for job in db.scalars(
@@ -733,6 +803,8 @@ def create_app(settings=None):
 
     @app.post("/api/admin/nodes", status_code=201)
     def create_node(data: NodeInput, user=Depends(admin), db: Session = Depends(get_db)):
+        if not data.name or len(data.name) < 1:
+            raise HTTPException(400, "Nome nodo obbligatorio")
         if db.get(Node, data.name):
             raise HTTPException(409, "Nome nodo già utilizzato")
         token = secrets.token_urlsafe(48)
@@ -748,9 +820,23 @@ def create_app(settings=None):
         node = db.get(Node, node_id)
         if not node:
             raise HTTPException(404)
-        node.slots, node.bandwidth_bps = data.slots, data.bandwidth_bps
+        node.slots = data.slots
+        node.bandwidth_bps = data.bandwidth_bps
+        node.enabled = data.enabled
         db.commit()
         return {"ok": True}
+
+    @app.post("/api/admin/nodes/{node_id}/token")
+    def regenerate_node_token(node_id: str, user=Depends(admin), db: Session = Depends(get_db)):
+        lock_scheduler(db)
+        node = db.get(Node, node_id)
+        if not node:
+            raise HTTPException(404)
+        token = secrets.token_urlsafe(48)
+        node.token_hash = digest(token)
+        node.enabled = True
+        db.commit()
+        return {"id": node.id, "token": token}
 
     @app.delete("/api/admin/nodes/{node_id}")
     def revoke_node(node_id: str, user=Depends(admin), db: Session = Depends(get_db)):

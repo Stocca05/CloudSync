@@ -1,25 +1,619 @@
 <!doctype html>
 <html lang="it">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#132a28"><title>CloudSync — Il tuo cloud, in movimento</title><link rel="stylesheet" href="/assets/styles.css"><script type="module" src="/assets/app.js"></script></head>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#090d16">
+  <title>CloudSync — Distributed Cloud Transfer & Sync</title>
+  <link rel="stylesheet" href="/assets/styles.css">
+  <script type="module" src="/assets/app.js"></script>
+</head>
 <body>
 <div id="toast" role="status" aria-live="polite" hidden></div>
+
+<!-- Authentication Screen -->
 <section id="auth" class="auth-screen">
-  <div class="auth-story"><a class="brand" href="/">◈ <span>CloudSync</span></a><span class="eyebrow">IL TUO CLOUD, IN MOVIMENTO</span><h1>Una destinazione.<br>Infinite possibilità.</h1><p>Collega i tuoi spazi, scegli cosa trasferire e lascia lavorare il server. Anche quando tu sei altrove.</p><div class="orbit"><span>Cloud A</span><i>············ ◈ ············</i><span>Cloud B</span></div><small>Il tuo spazio personale. I tuoi collegamenti. Il tuo ritmo.</small></div>
-  <div class="auth-panel"><form id="login-form"><span class="eyebrow">BENTORNATO</span><h2>Entra nel tuo spazio</h2><p class="muted">Bastano il tuo nome e la tua password.</p><label>Nome utente<input name="username" autocomplete="username" required maxlength="64" placeholder="Il tuo nome"></label><label>Password<input name="password" type="password" autocomplete="current-password" required maxlength="256" placeholder="La tua password"></label><button class="primary" type="submit">Accedi <span>↗</span></button><button id="register" type="button" class="quiet">Prima volta? Crea un account</button><p id="auth-error" class="error" role="alert"></p></form></div>
+  <div class="auth-story">
+    <a class="brand" href="/">◈ <span>CloudSync</span></a>
+    <span class="eyebrow">IL TUO CLOUD DISTRIBUITO</span>
+    <h1>Una destinazione.<br>Infinite possibilità.</h1>
+    <p>Collega i tuoi provider cloud, sincronizza cartelle in modo continuo a 2 vie e lascia lavorare i worker distribuito. Anche a computer spento.</p>
+    <div class="orbit">
+      <span>Google Drive</span>
+      <i>······ ⇄ ◈ ⇄ ······</i>
+      <span>iCloud / S3</span>
+    </div>
+    <small>Architettura distribuita multi-nodo · Crittografia end-to-end · Zero dipendenze esterne</small>
+  </div>
+  <div class="auth-panel">
+    <form id="login-form">
+      <span class="eyebrow">BENTORNATO</span>
+      <h2>Entra nel tuo spazio</h2>
+      <p class="muted">Accedi per gestire trasferimenti, nodi e sincronizzazioni.</p>
+      <label>Nome utente
+        <input name="username" autocomplete="username" required maxlength="64" placeholder="Il tuo nome">
+      </label>
+      <label>Password
+        <input name="password" type="password" autocomplete="current-password" required maxlength="256" placeholder="La tua password">
+      </label>
+      <button class="primary" type="submit">Accedi al Workspace <span>↗</span></button>
+      <button id="register" type="button" class="quiet">Prima volta? Crea un account</button>
+      <p id="auth-error" class="error" role="alert"></p>
+    </form>
+  </div>
 </section>
+
+<!-- Main Application Shell -->
 <div id="shell" class="shell" hidden>
-  <aside><a class="brand" href="/">◈ <span>CloudSync</span></a><span class="nav-caption">IL TUO SPAZIO</span><nav><button data-page="overview" class="selected">▦ <span>Panoramica</span></button><button data-page="remotes">◇ <span>Collegamenti</span></button><button data-page="explorer">⇄ <span>Esplora e trasferisci</span></button><button data-page="schedules">◷ <span>Sincronizzazioni</span></button><button data-page="admin" id="admin-nav" hidden>⌘ <span>Amministrazione</span></button></nav><div class="sidebar-bottom"><div class="server-note"><span class="dot"></span> Il server lavora per te<small>Puoi chiudere questa pagina.</small></div><button id="logout" class="quiet">Esci dal tuo account ↗</button></div></aside>
-  <main><header><div><span class="eyebrow">WORKSPACE PERSONALE</span><p id="welcome"></p></div><div class="avatar" id="avatar"></div></header>
-    <section id="page-overview" class="page"><div class="page-heading"><div><span class="eyebrow">TUTTO SOTTO CONTROLLO</span><h1>I tuoi trasferimenti</h1><p class="muted">Dal primo byte all’ultimo, anche a browser chiuso.</p></div><button class="primary" data-go="explorer">＋ Nuovo trasferimento</button></div><div class="metrics"><article><span>In esecuzione</span><strong id="metric-active">0</strong><small>Il tuo spazio, in movimento</small></article><article><span>In coda</span><strong id="metric-queued">0</strong><small>Pronti al prossimo turno</small></article><article><span>Completati</span><strong id="metric-done">0</strong><small>Negli ultimi 200 lavori</small></article><article class="accent-card"><span>Velocità attuale</span><strong id="metric-speed">0 B/s</strong><small>Banda condivisa in modo equo</small></article></div><div class="section-title"><h2>Velocità nel tempo</h2></div><div class="speed-chart-panel"><canvas id="speedChart" width="800" height="200" role="img" aria-label="Velocità dei tuoi trasferimenti negli ultimi aggiornamenti"></canvas></div><div class="section-title"><h2>Attività recente</h2><span class="muted">Aggiornamento automatico</span></div><div id="jobs" class="stack"></div></section>
-    <section id="page-remotes" class="page" hidden><div class="page-heading"><div><span class="eyebrow">I TUOI PUNTI DI PARTENZA</span><h1>Collegamenti cloud</h1><p class="muted">Aggiungi uno spazio. Le credenziali restano nel tuo account.</p></div><button id="add-remote" class="primary">＋ Collega un cloud</button></div><div id="remotes" class="remote-grid"></div></section>
-    <section id="page-explorer" class="page" hidden><div class="page-heading"><div><span class="eyebrow">DA QUI A LÌ</span><h1>Esplora e trasferisci</h1><p class="muted">Scegli due collegamenti e apri la cartella da trasferire.</p></div></div><div class="explorer-grid"><article class="panel"><div class="panel-head"><span class="step">01</span><h2>Sorgente</h2></div><label>Collegamento<select id="source-remote"></select></label><label>Percorso relativo<input id="source-path" placeholder="Cartella o file (vuoto = radice)"></label><div class="explorer-toolbar"><button id="browse-source" class="secondary">Esplora</button><button id="mkdir-source" class="quiet" title="Nuova cartella qui">+ Cartella</button></div><div id="source-files" class="file-list"><p class="muted">Seleziona un collegamento per esplorare i tuoi file.</p></div></article><article class="panel"><div class="panel-head"><span class="step">02</span><h2>Destinazione</h2></div><label>Collegamento<select id="destination-remote"></select></label><label>Percorso relativo<input id="destination-path" placeholder="Cartella di destinazione"></label><div class="explorer-toolbar"><button id="browse-destination" class="secondary">Esplora</button><button id="mkdir-destination" class="quiet" title="Nuova cartella qui">+ Cartella</button></div><div id="destination-files" class="file-list"><p class="muted">La copia di una cartella trasferisce il suo contenuto nel percorso scelto.</p></div></article></div><form id="transfer-form" class="panel transfer-bar"><label>Operazione<select id="operation"><option value="copy">Copia · conserva gli originali</option><option value="move">Sposta · rimuovi gli originali trasferiti</option><option value="sync">Sincronizzazione speculare · destinazione identica alla sorgente (➔)</option><option value="bisync">Sincronizzazione bidirezionale · 2 vie, modifiche riflesse (⇄)</option></select></label><label>Priorità nella tua coda<select id="priority"><option value="0">Normale</option><option value="1">Alta</option><option value="2">Urgente</option></select></label><label class="checkbox"><input id="is-file" type="checkbox"> Singolo file</label><button class="primary" type="submit">Avvia trasferimento →</button></form><form id="schedule-form" class="schedule-bar"><span>Sincronizzazione continua o periodica</span><label>Frequenza di controllo:<select id="schedule-interval"><option value="30">Sempre attivo · continuo ogni 30s</option><option value="60" selected>Sempre attivo · continuo ogni 1m</option><option value="120">Ogni 2 minuti</option><option value="300">Ogni 5 minuti</option><option value="900">Ogni 15 minuti</option><option value="3600">Ogni 1 ora</option></select></label><button type="submit" class="secondary">Attiva sincronizzazione continua ◷</button></form></section>
-    <section id="page-schedules" class="page" hidden><div class="page-heading"><div><span class="eyebrow">SEMPRE ATTIVO IN BACKGROUND</span><h1>Sincronizzazioni e Pianificazioni</h1><p class="muted">Processi sempre attivi e sincronizzazioni continue tra i tuoi cloud, a browser chiuso.</p></div><button data-go="explorer" class="primary">＋ Nuova sincronizzazione</button></div><div id="schedules" class="stack"></div></section>
-    <section id="page-admin" class="page" hidden><div class="page-heading"><div><span class="eyebrow">CONTROLLO DEL SERVIZIO</span><h1>Amministrazione</h1><p class="muted">Una coda condivisa, più nodi al lavoro.</p></div></div><form id="cluster-form" class="panel inline-form"><label>Banda totale (MiB/s)<input id="global-bandwidth" type="number" min="1" required></label><label>Lavori attivi massimi<input id="max-active" type="number" min="1" max="256" required></label><button class="primary">Salva limiti</button></form><div class="section-title"><h2>Nodi worker</h2><button id="add-node" class="secondary">＋ Aggiungi nodo</button></div><div id="nodes" class="remote-grid"></div><div class="section-title"><h2>Utenti e priorità</h2><span class="muted">Peso 2 = doppia quota rispetto a peso 1, a parità di limiti</span></div><div id="users" class="stack"></div><div class="section-title"><h2>Tutti i processi</h2><select id="admin-job-filter" aria-label="Filtra processi"><option value="">Tutti gli stati</option value="queued">In coda</option><option value="running">In corso</option><option value="failed">Errori</option><option value="completed">Completati</option><option value="cancelled">Annullati</option></select></div><p class="notice">La priorità ordina i lavori dello stesso utente e assegna più banda ai lavori attivi. Le quote utenti e i limiti del cluster restano rispettati.</p><div id="admin-jobs" class="stack"></div><div class="inline-form"><button id="admin-jobs-prev" class="secondary">Precedenti</button><span id="admin-jobs-page"></span><button id="admin-jobs-next" class="secondary">Successivi</button></div></section>
-    <footer>CloudSync <span>Il lavoro continua, anche quando ti disconnetti.</span></footer>
+  <aside>
+    <a class="brand" href="/">◈ <span>CloudSync</span></a>
+    <span class="nav-caption">NAVIGAZIONE</span>
+    <nav>
+      <button data-page="overview" class="selected">▦ <span>Panoramica</span></button>
+      <button data-page="remotes">◇ <span>Collegamenti</span></button>
+      <button data-page="explorer">⇄ <span>Esplora e trasferisci</span></button>
+      <button data-page="schedules">◷ <span>Sincronizzazioni</span></button>
+      <button data-page="admin" id="admin-nav" hidden>⌘ <span>Amministrazione</span></button>
+    </nav>
+    <div class="sidebar-bottom">
+      <div class="server-note">
+        <span class="dot"></span>
+        <div>
+          <strong>Cluster Operativo</strong>
+          <small id="sidebar-node-summary">Caricamento nodi...</small>
+        </div>
+      </div>
+      <button id="logout" class="quiet">Esci dall'account ↗</button>
+    </div>
+  </aside>
+
+  <main>
+    <header>
+      <div class="header-left">
+        <span class="eyebrow">WORKSPACE DISTRIBUITO</span>
+        <p id="welcome">Caricamento...</p>
+      </div>
+      <div class="header-right">
+        <div class="cluster-pill" id="cluster-status-pill">
+          <span class="live-dot"></span>
+          <span id="header-cluster-text">Cluster attivo</span>
+        </div>
+        <div class="avatar" id="avatar" title="Account utente">U</div>
+      </div>
+    </header>
+
+    <!-- Page: Overview -->
+    <section id="page-overview" class="page">
+      <div class="page-heading">
+        <div>
+          <span class="eyebrow">MONITORAGGIO TRASFERIMENTI</span>
+          <h1>Panoramica Cluster</h1>
+          <p class="muted">Telemetria in tempo reale, quote di banda e avanzamento trasferimenti.</p>
+        </div>
+        <div class="heading-actions">
+          <button class="primary" data-go="explorer">＋ Nuovo trasferimento</button>
+        </div>
+      </div>
+
+      <!-- Enhanced KPI Cards with Percentages -->
+      <div class="metrics">
+        <article class="kpi-card" id="kpi-active">
+          <div class="kpi-head">
+            <span>In esecuzione</span>
+            <span class="kpi-icon">⚡</span>
+          </div>
+          <strong id="metric-active">0</strong>
+          <div class="kpi-sub">
+            <span id="metric-active-slots">0 slot occupati</span>
+            <span class="kpi-badge blue" id="metric-active-pct">0%</span>
+          </div>
+          <div class="kpi-progress"><div class="kpi-progress-bar blue" id="kpi-bar-active" style="width: 0%"></div></div>
+        </article>
+
+        <article class="kpi-card" id="kpi-queued">
+          <div class="kpi-head">
+            <span>In coda</span>
+            <span class="kpi-icon">⏳</span>
+          </div>
+          <strong id="metric-queued">0</strong>
+          <div class="kpi-sub">
+            <span>Pronti al prossimo slot</span>
+            <span class="kpi-badge yellow" id="metric-queued-badge">0 in coda</span>
+          </div>
+          <div class="kpi-progress"><div class="kpi-progress-bar yellow" id="kpi-bar-queued" style="width: 0%"></div></div>
+        </article>
+
+        <article class="kpi-card" id="kpi-completed">
+          <div class="kpi-head">
+            <span>Completati</span>
+            <span class="kpi-icon">✔</span>
+          </div>
+          <strong id="metric-done">0</strong>
+          <div class="kpi-sub">
+            <span id="metric-success-rate">Tasso successo: 100%</span>
+            <span class="kpi-badge green" id="metric-done-badge">100%</span>
+          </div>
+          <div class="kpi-progress"><div class="kpi-progress-bar green" id="kpi-bar-done" style="width: 100%"></div></div>
+        </article>
+
+        <article class="kpi-card accent-card" id="kpi-speed">
+          <div class="kpi-head">
+            <span>Velocità cluster</span>
+            <span class="kpi-icon">🚀</span>
+          </div>
+          <strong id="metric-speed">0 B/s</strong>
+          <div class="kpi-sub">
+            <span id="metric-speed-util">Quota utilizzata: 0%</span>
+            <span class="kpi-badge blue" id="metric-speed-pct">0%</span>
+          </div>
+          <div class="kpi-progress"><div class="kpi-progress-bar blue" id="kpi-bar-speed" style="width: 0%"></div></div>
+        </article>
+      </div>
+
+      <!-- Real-time Speed Chart with Statistics Header -->
+      <div class="speed-chart-panel">
+        <div class="chart-header">
+          <div>
+            <h2>Velocità nel tempo</h2>
+            <span class="muted">Telemetria in tempo reale campionata ogni 4 secondi</span>
+          </div>
+          <div class="chart-stats">
+            <span class="stat-item"><small>Attuale:</small> <strong id="chart-cur-speed">0 B/s</strong></span>
+            <span class="stat-item"><small>Picco:</small> <strong id="chart-peak-speed">0 B/s</strong></span>
+            <span class="stat-item"><small>Media:</small> <strong id="chart-avg-speed">0 B/s</strong></span>
+          </div>
+        </div>
+        <div class="canvas-container">
+          <canvas id="speedChart" width="800" height="180" role="img" aria-label="Velocità dei trasferimenti nel tempo"></canvas>
+        </div>
+      </div>
+
+      <!-- Activity Toolbar with Search & Filter Tabs -->
+      <div class="activity-header">
+        <div class="section-title">
+          <h2>Attività recente</h2>
+          <span class="live-tag"><span class="pulse-dot"></span> In tempo reale</span>
+        </div>
+        <div class="filter-controls">
+          <div class="search-box">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="job-search" placeholder="Cerca trasferimento (es. Foto, Google, iCloud, ID)..." autocomplete="off">
+          </div>
+          <div class="tab-filters" id="job-filter-tabs">
+            <button class="tab-pill selected" data-filter="all">Tutti <span class="tab-counter" id="count-all">0</span></button>
+            <button class="tab-pill" data-filter="running">In corso <span class="tab-counter" id="count-running">0</span></button>
+            <button class="tab-pill" data-filter="queued">In coda <span class="tab-counter" id="count-queued">0</span></button>
+            <button class="tab-pill" data-filter="completed">Completati <span class="tab-counter" id="count-completed">0</span></button>
+            <button class="tab-pill" data-filter="failed">Errori <span class="tab-counter" id="count-failed">0</span></button>
+          </div>
+        </div>
+      </div>
+
+      <div id="jobs" class="stack"></div>
+    </section>
+
+    <!-- Page: Remotes -->
+    <section id="page-remotes" class="page" hidden>
+      <div class="page-heading">
+        <div>
+          <span class="eyebrow">I TUOI PUNTI DI PARTENZA</span>
+          <h1>Collegamenti Cloud</h1>
+          <p class="muted">Gestisci le connessioni ai tuoi provider cloud. Le credenziali sono cifrate con chiave AES-128 nel vault sicuro.</p>
+        </div>
+        <button id="add-remote" class="primary">＋ Collega un cloud</button>
+      </div>
+      <div id="remotes" class="remote-grid"></div>
+    </section>
+
+    <!-- Page: Explorer -->
+    <section id="page-explorer" class="page" hidden>
+      <div class="page-heading">
+        <div>
+          <span class="eyebrow">TRASFERIMENTO E GESTIONE FILE</span>
+          <h1>Esplora e trasferisci</h1>
+          <p class="muted">Sfoglia le cartelle sorgente e destinazione, crea cartelle o elimina file con navigazione a briciole di pane.</p>
+        </div>
+      </div>
+      <div class="explorer-grid">
+        <!-- Source Panel -->
+        <article class="panel">
+          <div class="panel-head">
+            <span class="step">01</span>
+            <div>
+              <h2>Sorgente</h2>
+              <small class="muted">Origine dei file da copiare o sincronizzare</small>
+            </div>
+          </div>
+          <label>Collegamento cloud
+            <select id="source-remote"></select>
+          </label>
+          <div class="breadcrumbs-bar" id="source-breadcrumbs">
+            <span class="crumb root" data-side="source" data-path="">Radice /</span>
+          </div>
+          <label>Percorso relativo
+            <input id="source-path" placeholder="Cartella o file (vuoto = radice)">
+          </label>
+          <div class="explorer-toolbar">
+            <button id="browse-source" class="secondary">Esplora</button>
+            <button id="mkdir-source" class="quiet" title="Nuova cartella qui">+ Cartella</button>
+            <div class="filter-mini">
+              <input type="text" id="source-filter" placeholder="Filtra in questa cartella..." autocomplete="off">
+            </div>
+          </div>
+          <div class="file-summary muted" id="source-summary">Nessuna cartella caricata</div>
+          <div id="source-files" class="file-list">
+            <p class="muted">Seleziona un collegamento per esplorare i tuoi file.</p>
+          </div>
+        </article>
+
+        <!-- Destination Panel -->
+        <article class="panel">
+          <div class="panel-head">
+            <span class="step">02</span>
+            <div>
+              <h2>Destinazione</h2>
+              <small class="muted">Destinazione del flusso di sincronizzazione</small>
+            </div>
+          </div>
+          <label>Collegamento cloud
+            <select id="destination-remote"></select>
+          </label>
+          <div class="breadcrumbs-bar" id="destination-breadcrumbs">
+            <span class="crumb root" data-side="destination" data-path="">Radice /</span>
+          </div>
+          <label>Percorso relativo
+            <input id="destination-path" placeholder="Cartella di destinazione">
+          </label>
+          <div class="explorer-toolbar">
+            <button id="browse-destination" class="secondary">Esplora</button>
+            <button id="mkdir-destination" class="quiet" title="Nuova cartella qui">+ Cartella</button>
+            <div class="filter-mini">
+              <input type="text" id="destination-filter" placeholder="Filtra in questa cartella..." autocomplete="off">
+            </div>
+          </div>
+          <div class="file-summary muted" id="destination-summary">Nessuna cartella caricata</div>
+          <div id="destination-files" class="file-list">
+            <p class="muted">La copia di una cartella trasferisce il suo contenuto nel percorso scelto.</p>
+          </div>
+        </article>
+      </div>
+
+      <!-- Action Bars -->
+      <form id="transfer-form" class="panel transfer-bar">
+        <label>Operazione
+          <select id="operation">
+            <option value="copy">Copia · conserva gli originali</option>
+            <option value="move">Sposta · rimuovi gli originali trasferiti</option>
+            <option value="sync">Sincronizzazione speculare · destinazione identica alla sorgente (➔)</option>
+            <option value="bisync">Sincronizzazione bidirezionale · 2 vie, modifiche riflesse (⇄)</option>
+          </select>
+        </label>
+        <label>Priorità nella coda
+          <select id="priority">
+            <option value="0">Normale (peso standard)</option>
+            <option value="1">Alta (priorità avanzata)</option>
+            <option value="2">Urgente (massima allocazione)</option>
+          </select>
+        </label>
+        <label class="checkbox">
+          <input id="is-file" type="checkbox"> Singolo file
+        </label>
+        <button class="primary" type="submit">Avvia trasferimento →</button>
+      </form>
+
+      <form id="schedule-form" class="schedule-bar">
+        <div class="schedule-info">
+          <span class="schedule-badge">SEMPRE ATTIVO</span>
+          <span>Sincronizzazione Continua in Background</span>
+        </div>
+        <label>Controllo e sync ogni:
+          <select id="schedule-interval">
+            <option value="30">Sempre attivo · continuo ogni 30s</option>
+            <option value="60" selected>Sempre attivo · continuo ogni 1 minuto</option>
+            <option value="120">Ogni 2 minuti</option>
+            <option value="300">Ogni 5 minuti</option>
+            <option value="900">Ogni 15 minuti</option>
+            <option value="3600">Ogni 1 ora</option>
+          </select>
+        </label>
+        <button type="submit" class="secondary">Attiva sincronizzazione continua ◷</button>
+      </form>
+    </section>
+
+    <!-- Page: Schedules / Sincronizzazioni -->
+    <section id="page-schedules" class="page" hidden>
+      <div class="page-heading">
+        <div>
+          <span class="eyebrow">SEMPRE ATTIVO IN BACKGROUND</span>
+          <h1>Sincronizzazioni e Pianificazioni</h1>
+          <p class="muted">Processi permanenti attivi in background per mantenere cartelle speculari o bidirezionali tra provider diversi a browser chiuso.</p>
+        </div>
+        <button data-go="explorer" class="primary">＋ Nuova sincronizzazione</button>
+      </div>
+      <div id="schedules" class="stack"></div>
+    </section>
+
+    <!-- Page: Admin Command Center -->
+    <section id="page-admin" class="page" hidden>
+      <div class="page-heading">
+        <div>
+          <span class="eyebrow">PANNELLO DI CONTROLLO AMMINISTRATORE</span>
+          <h1>Amministrazione Cluster</h1>
+          <p class="muted">Centro di comando distribuito: monitoraggio nodi, bilanciamento banda, gestione utenti e audit log.</p>
+        </div>
+      </div>
+
+      <!-- Cluster Telemetry Hero Cards -->
+      <div class="metrics admin-metrics">
+        <article class="kpi-card" id="admin-kpi-nodes">
+          <div class="kpi-head">
+            <span>Nodi Attivi</span>
+            <span class="kpi-icon">⌘</span>
+          </div>
+          <strong id="admin-metric-nodes">0 / 0</strong>
+          <div class="kpi-sub">
+            <span id="admin-metric-nodes-sub">Tutti i nodi operativi</span>
+            <span class="kpi-badge green" id="admin-metric-nodes-badge">100% Online</span>
+          </div>
+          <div class="kpi-progress"><div class="kpi-progress-bar green" id="admin-bar-nodes" style="width: 100%"></div></div>
+        </article>
+
+        <article class="kpi-card" id="admin-kpi-slots">
+          <div class="kpi-head">
+            <span>Capacità Slot Cluster</span>
+            <span class="kpi-icon">⚙</span>
+          </div>
+          <strong id="admin-metric-slots">0 / 0</strong>
+          <div class="kpi-sub">
+            <span id="admin-metric-slots-sub">0% slot occupati</span>
+            <span class="kpi-badge blue" id="admin-metric-slots-badge">0%</span>
+          </div>
+          <div class="kpi-progress"><div class="kpi-progress-bar blue" id="admin-bar-slots" style="width: 0%"></div></div>
+        </article>
+
+        <article class="kpi-card" id="admin-kpi-bandwidth">
+          <div class="kpi-head">
+            <span>Banda Cluster Consumata</span>
+            <span class="kpi-icon">🌐</span>
+          </div>
+          <strong id="admin-metric-bandwidth">0 B/s</strong>
+          <div class="kpi-sub">
+            <span id="admin-metric-bandwidth-sub">di 0 MiB/s limite globale</span>
+            <span class="kpi-badge blue" id="admin-metric-bandwidth-badge">0%</span>
+          </div>
+          <div class="kpi-progress"><div class="kpi-progress-bar blue" id="admin-bar-bandwidth" style="width: 0%"></div></div>
+        </article>
+
+        <article class="kpi-card" id="admin-kpi-health">
+          <div class="kpi-head">
+            <span>Affidabilità Cluster</span>
+            <span class="kpi-icon">🛡️</span>
+          </div>
+          <strong id="admin-metric-health">100%</strong>
+          <div class="kpi-sub">
+            <span id="admin-metric-health-sub">0 completati · 0 falliti</span>
+            <span class="kpi-badge green" id="admin-metric-health-badge">Eccellente</span>
+          </div>
+          <div class="kpi-progress"><div class="kpi-progress-bar green" id="admin-bar-health" style="width: 100%"></div></div>
+        </article>
+      </div>
+
+      <!-- Cluster Global Limits Configuration -->
+      <form id="cluster-form" class="panel inline-form">
+        <div class="form-title">
+          <h3>Limiti Globali di Rete</h3>
+          <small class="muted">Definisci il tetto massimo di traffico e la concorrenza complessiva del cluster.</small>
+        </div>
+        <div class="form-inputs">
+          <label>Banda globale cluster (MiB/s)
+            <input id="global-bandwidth" type="number" min="1" required>
+          </label>
+          <label>Lavori contemporanei massimi
+            <input id="max-active" type="number" min="1" max="256" required>
+          </label>
+          <button class="primary" type="submit">Salva limiti cluster</button>
+        </div>
+      </form>
+
+      <!-- Worker Nodes Section -->
+      <div class="section-title">
+        <div>
+          <h2>Nodi Worker Distribuiti</h2>
+          <span class="muted">Worker registrati in grado di eseguire trasferimenti e sincronizzazioni in parallelo</span>
+        </div>
+        <button id="add-node" class="secondary">＋ Registra nuovo nodo</button>
+      </div>
+      <div id="nodes" class="remote-grid"></div>
+
+      <!-- User Management Table -->
+      <div class="section-title">
+        <div>
+          <h2>Utenti, Ruoli e Priorità di Banda</h2>
+          <span class="muted">Gestione account, quote di trasferimento e autorizzazioni di sistema</span>
+        </div>
+      </div>
+      <div id="users" class="stack"></div>
+
+      <!-- Admin Jobs Queue & History -->
+      <div class="section-title">
+        <div>
+          <h2>Monitoraggio Tutti i Processi</h2>
+          <span class="muted">Ispeziona, migra nodi in tempo reale o interrompi trasferimenti su scala globale</span>
+        </div>
+        <div class="filter-mini">
+          <select id="admin-job-filter" aria-label="Filtra processi">
+            <option value="">Tutti gli stati</option>
+            <option value="running">In corso</option>
+            <option value="queued">In coda</option>
+            <option value="failed">Errori</option>
+            <option value="completed">Completati</option>
+            <option value="cancelled">Annullati</option>
+          </select>
+        </div>
+      </div>
+      <p class="notice">La priorità ordina i lavori dello stesso utente e assegna più banda ai lavori attivi. È possibile migrare qualsiasi lavoro a caldo verso un altro nodo dal menu dedicato.</p>
+      <div id="admin-jobs" class="stack"></div>
+      <div class="inline-form pagination-bar">
+        <button id="admin-jobs-prev" class="secondary">Precedenti</button>
+        <span id="admin-jobs-page" class="page-indicator">Pagina 1</span>
+        <button id="admin-jobs-next" class="secondary">Successivi</button>
+      </div>
+
+      <!-- System Event Ledger / Audit Log -->
+      <div class="section-title">
+        <div>
+          <h2>Registro Eventi di Sistema (Audit Feed)</h2>
+          <span class="muted">Attività recenti del cluster, failover e sincronizzazioni</span>
+        </div>
+      </div>
+      <div id="admin-events" class="event-feed panel"></div>
+    </section>
+
+    <footer>
+      <div class="footer-content">
+        <span>◈ CloudSync Distributed Enterprise</span>
+        <span class="muted">I tuoi dati viaggiano in sicurezza tra provider cloud, 24/7/365.</span>
+      </div>
+    </footer>
   </main>
 </div>
-<dialog id="remote-dialog"><form id="remote-form"><div class="dialog-title"><h2>Collega il tuo cloud</h2><button class="quiet" type="button" data-close="remote-dialog" aria-label="Chiudi">✕</button></div><label>Nome del collegamento<input name="name" placeholder="Il mio archivio" required maxlength="80"></label><label>Servizio<select name="provider" id="provider"></select></label><p id="provider-help" class="notice"></p><div id="provider-fields"></div><p id="remote-error" class="error"></p><button id="remote-submit" class="primary" type="submit">Salva collegamento</button></form></dialog>
-<dialog id="node-dialog"><form id="node-form"><div class="dialog-title"><h2>Aggiungi un nodo</h2><button class="quiet" type="button" data-close="node-dialog" aria-label="Chiudi">✕</button></div><label>Nome nodo<input name="name" required pattern="[a-zA-Z0-9_-]+" placeholder="worker-02"></label><label>Trasferimenti contemporanei<input name="slots" type="number" min="1" max="32" value="2" required></label><label>Banda massima (MiB/s)<input name="bandwidth" type="number" min="1" value="50" required></label><button class="primary">Crea nodo</button><div id="node-token" hidden><p class="notice">Salva questo token sul nuovo nodo come WORKER_TOKEN. Verrà mostrato una sola volta.</p><textarea readonly aria-label="Token del worker"></textarea><p>Imposta CONTROL_URL con l’indirizzo HTTPS del servizio e avvia <code>./start worker</code>.</p></div></form></dialog>
-<dialog id="apple-dialog"><form id="apple-form"><div class="dialog-title"><h2>Collega iCloud Drive</h2><button class="quiet" type="button" data-close="apple-dialog" aria-label="Chiudi">✕</button></div><p id="apple-status" class="notice">Connessione ad Apple in preparazione…</p><label id="apple-answer-label" hidden>Codice o risposta richiesta<input id="apple-answer" autocomplete="one-time-code" type="password" maxlength="2048"></label><div id="apple-examples"></div><button id="apple-submit" class="primary" hidden>Continua</button><button id="apple-cancel" type="button" class="quiet">Annulla connessione</button></form></dialog>
-<template id="empty-template"><div class="empty"><span>◇</span><h3></h3><p class="muted"></p></div></template>
-</body></html>
+
+<!-- Dialog: Add / Edit Remote -->
+<dialog id="remote-dialog">
+  <form id="remote-form">
+    <div class="dialog-title">
+      <h2>Collega il tuo Cloud</h2>
+      <button class="quiet" type="button" data-close="remote-dialog" aria-label="Chiudi">✕</button>
+    </div>
+    <label>Nome identificativo del collegamento
+      <input name="name" placeholder="Es. Google Drive Lavoro, S3 Backup..." required maxlength="80">
+    </label>
+    <label>Provider di archiviazione
+      <select name="provider" id="provider"></select>
+    </label>
+    <p id="provider-help" class="notice"></p>
+    <div id="provider-fields"></div>
+    <p id="remote-error" class="error"></p>
+    <div class="dialog-actions">
+      <button class="secondary" type="button" data-close="remote-dialog">Annulla</button>
+      <button id="remote-submit" class="primary" type="submit">Salva collegamento</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Dialog: Add Worker Node -->
+<dialog id="node-dialog">
+  <form id="node-form">
+    <div class="dialog-title">
+      <h2>Registra un Nuovo Nodo Worker</h2>
+      <button class="quiet" type="button" data-close="node-dialog" aria-label="Chiudi">✕</button>
+    </div>
+    <label>Nome univoco nodo (hostname o etichetta)
+      <input name="name" required pattern="[a-zA-Z0-9_-]+" placeholder="Es. worker-mac, worker-proxmox-02">
+    </label>
+    <label>Trasferimenti contemporanei (Slot massimi)
+      <input name="slots" type="number" min="1" max="32" value="4" required>
+    </label>
+    <label>Banda massima assegnata (MiB/s)
+      <input name="bandwidth" type="number" min="1" value="50" required>
+    </label>
+    <div class="dialog-actions">
+      <button class="secondary" type="button" data-close="node-dialog">Annulla</button>
+      <button class="primary" type="submit">Crea nodo e genera token</button>
+    </div>
+    <div id="node-token" hidden>
+      <p class="notice">Salva questo token di sicurezza sul nuovo nodo come <code>WORKER_TOKEN</code> nel file <code>.env</code>. Verrà mostrato una sola volta per ragioni di sicurezza.</p>
+      <textarea readonly aria-label="Token del worker"></textarea>
+      <p class="muted">Avvia il worker con <code>./start_node.sh</code> sul terminale del dispositivo o come servizio di sistema.</p>
+    </div>
+  </form>
+</dialog>
+
+<!-- Dialog: Edit Existing Node Limits -->
+<dialog id="edit-node-dialog">
+  <form id="edit-node-form">
+    <div class="dialog-title">
+      <h2>Modifica Parametri Nodo <span id="edit-node-name"></span></h2>
+      <button class="quiet" type="button" data-close="edit-node-dialog" aria-label="Chiudi">✕</button>
+    </div>
+    <input type="hidden" id="edit-node-id">
+    <label>Slot massimi in parallelo
+      <input id="edit-node-slots" type="number" min="1" max="32" required>
+    </label>
+    <label>Banda massima allocata (MiB/s)
+      <input id="edit-node-bandwidth" type="number" min="1" required>
+    </label>
+    <label class="checkbox">
+      <input id="edit-node-enabled" type="checkbox"> Nodo attivo (deseleziona per manutenzione / graceful drain)
+    </label>
+    <div class="dialog-actions">
+      <button class="secondary" type="button" data-close="edit-node-dialog">Annulla</button>
+      <button class="primary" type="submit">Salva modifiche nodo</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Dialog: Edit User Policy & Role -->
+<dialog id="edit-user-dialog">
+  <form id="edit-user-form">
+    <div class="dialog-title">
+      <h2>Modifica Utente <span id="edit-user-name"></span></h2>
+      <button class="quiet" type="button" data-close="edit-user-dialog" aria-label="Chiudi">✕</button>
+    </div>
+    <input type="hidden" id="edit-user-id">
+    <label>Peso banda (1-10)
+      <input id="edit-user-weight" type="number" min="1" max="10" required>
+    </label>
+    <label>Lavori massimi contemporanei
+      <input id="edit-user-slots" type="number" min="1" max="16" required>
+    </label>
+    <label>Quota banda massima MiB/s (0 = illimitata)
+      <input id="edit-user-band" type="number" min="0" required>
+    </label>
+    <label>Reimposta password (lascia vuoto per non modificare)
+      <input id="edit-user-password" type="password" minlength="6" placeholder="Nuova password (min 6 caratteri)">
+    </label>
+    <div class="checkbox-group">
+      <label class="checkbox">
+        <input id="edit-user-admin" type="checkbox"> Amministratore di sistema
+      </label>
+      <label class="checkbox">
+        <input id="edit-user-enabled" type="checkbox"> Account attivo
+      </label>
+    </div>
+    <div class="dialog-actions">
+      <button class="secondary" type="button" data-close="edit-user-dialog">Annulla</button>
+      <button class="primary" type="submit">Salva impostazioni utente</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Dialog: Apple iCloud 2FA Verification -->
+<dialog id="apple-dialog">
+  <form id="apple-form">
+    <div class="dialog-title">
+      <h2>Verifica Sicurezza Apple ID</h2>
+      <button class="quiet" type="button" data-close="apple-dialog" aria-label="Chiudi">✕</button>
+    </div>
+    <p id="apple-status" class="notice">Connessione ad Apple in preparazione…</p>
+    <label id="apple-answer-label" hidden>Codice o risposta richiesta
+      <input id="apple-answer" autocomplete="one-time-code" type="password" maxlength="2048">
+    </label>
+    <div id="apple-examples"></div>
+    <div class="dialog-actions">
+      <button id="apple-cancel" type="button" class="quiet">Annulla</button>
+      <button id="apple-submit" class="primary" hidden>Invia codice verifica</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Template: Empty State -->
+<template id="empty-template">
+  <div class="empty">
+    <span class="empty-icon">◈</span>
+    <h3></h3>
+    <p class="muted"></p>
+  </div>
+</template>
+</body>
+</html>
