@@ -278,6 +278,28 @@ def build_rclone_command(job, config, port, log_path):
     if op == "delete":
         return ["rclone", "deletefile" if job.get("is_file") else "purge", source, *common]
     
+    if op == "sync":
+        dest_path = (job.get("destination_path") or "").strip()
+        destination = "r" + job["destination_id"] + ":" + dest_path
+        return ["rclone", "sync", source, destination, *common]
+    if op == "bisync":
+        dest_path = (job.get("destination_path") or "").strip()
+        destination = "r" + job["destination_id"] + ":" + dest_path
+        bisync_cmd = [
+            "rclone",
+            "bisync",
+            source,
+            destination,
+            "--create-empty-src-dirs",
+            "--resilient",
+            "--recover",
+            "--resync-mode",
+            "newer",
+        ]
+        if job.get("resync"):
+            bisync_cmd.append("--resync")
+        bisync_cmd.extend(common)
+        return bisync_cmd
     dest_path = (job.get("destination_path") or "").strip()
     if job.get("is_file"):
         source_name = Path(job.get("source_path", "")).name
@@ -443,6 +465,42 @@ def execute_job(api_url: str, token: str, job: dict):
                 state.finish_job(job_id, True, "Lavoro rilasciato al cluster (nodo interrotto)")
                 return
 
+            if job.get("operation") == "bisync" and process.returncode != 0 and not cancelled and not shutdown:
+                resync_needed = False
+                if log_path.exists():
+                    try:
+                        with log_path.open("r", encoding="utf-8", errors="ignore") as lf:
+                            content = lf.read()
+                            if any(k in content for k in ["Must run --resync", "cannot find prior", "resync to recover"]):
+                                resync_needed = True
+                    except Exception:
+                        pass
+                if resync_needed:
+                    resync_cmd = list(cmd)
+                    if "--resync" not in resync_cmd:
+                        resync_cmd.insert(4, "--resync")
+                    if log_path.exists():
+                        log_path.unlink(missing_ok=True)
+                    process = subprocess.Popen(
+                        resync_cmd,
+                        env=env,
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                    )
+                    while not STOP.is_set():
+                        payload["stats"] = read_rclone_progress(log_path)
+                        state.update_job_progress(job_id, payload["stats"])
+                        try:
+                            reply = api.post(base + "/heartbeat", json=payload).json()
+                            if reply.get("cancel_requested"):
+                                cancelled = True
+                                stop_process(process)
+                                break
+                        except Exception:
+                            pass
+                        if process.poll() is not None:
+                            break
+                        STOP.wait(1.0)
             payload["stats"] = read_rclone_progress(log_path)
             state.update_job_progress(job_id, payload["stats"])
             success = (process.returncode == 0) and not cancelled and not shutdown
@@ -651,16 +709,22 @@ def create_dashboard_layout(data: dict) -> Layout:
         table.add_column("ETA", width=10, justify="right", style="yellow")
 
         for j in jobs:
-            op_style = "bold cyan" if j["operation"] == "copy" else "bold yellow"
+            if j["operation"] == "copy":
+                op_style = "bold cyan"
+            elif j["operation"] in {"sync", "bisync"}:
+                op_style = "bold magenta"
+            else:
+                op_style = "bold yellow"
             p_bar = render_progress_bar(j["percentage"], 10)
             prog_text = f"[{p_bar}] {j['percentage']:.1f}%"
             bytes_text = f"{format_bytes(j['bytes'])} / {format_bytes(j['total_bytes'])}"
             speed_text = format_speed(j["speed"])
             eta_text = format_duration(j["eta"]) if j["eta"] else "--:--"
 
+            arrow = " ⇄ " if j["operation"] == "bisync" else " ➔ "
             route_text = Text()
             route_text.append(j["source"], style="white")
-            route_text.append(" ➔ ", style="bold cyan")
+            route_text.append(arrow, style="bold cyan")
             route_text.append(j["destination"], style="white")
             if j.get("active_file"):
                 route_text.append(f"\n↳ {j['active_file'][:40]}", style="dim italic")

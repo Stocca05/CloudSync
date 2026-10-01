@@ -38,7 +38,7 @@ class JobInput(BaseModel):
     destination_id: str | None = None
     source_path: str = ""
     destination_path: str = ""
-    operation: Literal["list", "copy", "move", "mkdir", "delete"] = "copy"
+    operation: Literal["list", "copy", "move", "mkdir", "delete", "sync", "bisync"] = "copy"
     is_file: bool = False
     priority: int = Field(default=0, ge=0, le=2)
     confirm_move: bool = False
@@ -47,7 +47,7 @@ class JobInput(BaseModel):
 
 class ScheduleInput(BaseModel):
     job: JobInput
-    interval_seconds: int = Field(ge=300, le=31536000)
+    interval_seconds: int = Field(ge=30, le=31536000)
 
 
 class UserPolicy(BaseModel):
@@ -251,7 +251,7 @@ def create_app(settings=None):
             "trust_token"
         ):
             raise HTTPException(409, "Completa prima la connessione iCloud e il codice 2FA")
-        if spec.operation in {"copy", "move"}:
+        if spec.operation in {"copy", "move", "sync", "bisync"}:
             destination_remote = owned(db, Remote, spec.destination_id, user)
             if destination_remote.provider == "iclouddrive" and not vault.decrypt(
                 destination_remote.encrypted_config
@@ -261,6 +261,8 @@ def create_app(settings=None):
                 raise HTTPException(400, "Scegli due collegamenti distinti")
         if spec.operation == "move" and not spec.confirm_move:
             raise HTTPException(400, "Conferma lo spostamento e la rimozione della sorgente")
+        if spec.operation in {"sync", "bisync"} and spec.is_file:
+            raise HTTPException(400, "La sincronizzazione di cartelle richiede directory e non singoli file")
         try:
             source = safe_path(spec.source_path)
             destination = safe_path(spec.destination_path)
@@ -554,6 +556,7 @@ def create_app(settings=None):
                 "interval_seconds": s.interval_seconds,
                 "next_run": s.next_run,
                 "enabled": s.enabled,
+                "last_job_id": s.last_job_id,
             }
             for s in db.scalars(select(Schedule).where(Schedule.user_id == user.id))
         ]
@@ -562,8 +565,8 @@ def create_app(settings=None):
     def create_schedule(data: ScheduleInput, user=Depends(current_user), db: Session = Depends(get_db)):
         lock_scheduler(db)
         values = validate_job(db, data.job, user)
-        if data.job.operation != "copy":
-            raise HTTPException(400, "Le pianificazioni supportano la copia")
+        if data.job.operation not in {"copy", "sync", "bisync"}:
+            raise HTTPException(400, "Le pianificazioni supportano copia, sincronizzazione speculare e bidirezionale")
         if db.scalar(select(func.count()).select_from(Schedule).where(Schedule.user_id == user.id)) >= 20:
             raise HTTPException(409, "Limite di 20 pianificazioni raggiunto")
         schedule = Schedule(
@@ -572,6 +575,25 @@ def create_app(settings=None):
         db.add(schedule)
         db.commit()
         return {"id": schedule.id}
+
+    @app.post("/api/schedules/{schedule_id}/toggle")
+    def toggle_schedule(schedule_id: str, user=Depends(current_user), db: Session = Depends(get_db)):
+        lock_scheduler(db)
+        schedule = owned(db, Schedule, schedule_id, user)
+        schedule.enabled = not schedule.enabled
+        if schedule.enabled:
+            schedule.next_run = time.time()
+        db.commit()
+        return {"id": schedule.id, "enabled": schedule.enabled}
+
+    @app.post("/api/schedules/{schedule_id}/run")
+    def run_schedule(schedule_id: str, user=Depends(current_user), db: Session = Depends(get_db)):
+        lock_scheduler(db)
+        schedule = owned(db, Schedule, schedule_id, user)
+        schedule.next_run = time.time()
+        maintain(db)
+        db.commit()
+        return {"id": schedule.id, "triggered": True}
 
     @app.delete("/api/schedules/{schedule_id}")
     def delete_schedule(schedule_id: str, user=Depends(current_user), db: Session = Depends(get_db)):

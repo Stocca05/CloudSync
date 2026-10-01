@@ -87,6 +87,28 @@ def command(job, config, port, log_path):
         return ["rclone", "mkdir", source, *common]
     if job["operation"] == "delete":
         return ["rclone", "deletefile" if job.get("is_file") else "purge", source, *common]
+    if job["operation"] == "sync":
+        dest_path = (job.get("destination_path") or "").strip()
+        destination = "r" + job["destination_id"] + ":" + dest_path
+        return ["rclone", "sync", source, destination, *common]
+    if job["operation"] == "bisync":
+        dest_path = (job.get("destination_path") or "").strip()
+        destination = "r" + job["destination_id"] + ":" + dest_path
+        bisync_cmd = [
+            "rclone",
+            "bisync",
+            source,
+            destination,
+            "--create-empty-src-dirs",
+            "--resilient",
+            "--recover",
+            "--resync-mode",
+            "newer",
+        ]
+        if job.get("resync"):
+            bisync_cmd.append("--resync")
+        bisync_cmd.extend(common)
+        return bisync_cmd
     operation = job["operation"]
     dest_path = (job.get("destination_path") or "").strip()
     if job.get("is_file"):
@@ -173,8 +195,9 @@ def run_job(api_url, token, job):
                 sock.bind(("127.0.0.1", 0))
                 port = sock.getsockname()[1]
             with output_path.open("wb") as output, (root / "stderr").open("wb") as errors:
+                cmd = command(job, config, port, log_path)
                 process = subprocess.Popen(
-                    command(job, config, port, log_path), stdout=output, stderr=errors, env=env
+                    cmd, stdout=output, stderr=errors, env=env
                 )
                 with httpx.Client(base_url=f"http://127.0.0.1:{port}", auth=auth, timeout=2) as rc:
                     while True:
@@ -233,6 +256,42 @@ def run_job(api_url, token, job):
                 except Exception:
                     pass
                 return
+            if job["operation"] == "bisync" and process.returncode != 0 and not cancelled and not shutdown:
+                resync_needed = False
+                if log_path.exists():
+                    try:
+                        with log_path.open("r", encoding="utf-8", errors="ignore") as lf:
+                            content = lf.read()
+                            if any(k in content for k in ["Must run --resync", "cannot find prior", "resync to recover"]):
+                                resync_needed = True
+                    except Exception:
+                        pass
+                if resync_needed:
+                    log.info("job %s bisync requires resync: re-running with --resync", job_id)
+                    resync_cmd = list(cmd)
+                    if "--resync" not in resync_cmd:
+                        resync_cmd.insert(4, "--resync")
+                    if log_path.exists():
+                        log_path.unlink(missing_ok=True)
+                    process = subprocess.Popen(
+                        resync_cmd,
+                        env=env,
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                    )
+                    while not STOP.is_set():
+                        payload["stats"] = read_progress(log_path)
+                        try:
+                            reply = api.post(base + "/heartbeat", json=payload).json()
+                            if reply.get("cancel_requested"):
+                                cancelled = True
+                                stop_process(process)
+                                break
+                        except (httpx.HTTPError, ValueError):
+                            pass
+                        if process.poll() is not None:
+                            break
+                        STOP.wait(3)
             payload["stats"] = read_progress(log_path)
             success = process.returncode == 0 and not cancelled and not shutdown
             result = result_listing(output_path) if success and job["operation"] == "list" else {}

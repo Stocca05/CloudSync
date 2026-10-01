@@ -51,6 +51,13 @@ Connect cloud accounts, explore files across multiple providers simultaneously, 
 - **Background Watchdog:** A dedicated control plane watchdog continuously monitors worker heartbeats, automatically detects offline nodes, unpins stuck jobs, and dispatches them to the next available worker.
 - **Weighted Fair-Share Scheduling:** Dynamic bandwidth allocation and fair job rotation prevent one heavy transfer from starving other users or nodes.
 
+### 🔁 Continuous & Bidirectional Cloud Folder Synchronization
+- **Always-On Background Sync:** Keep two folders continuously synchronized across different cloud providers, completely unattended in the background even when your browser is closed.
+- **2-Way Bidirectional Sync (`bisync` ⇄):** Additions, modifications, and deletions made on either provider automatically replicate to the other provider with conflict resolution and self-healing auto-resync.
+- **1-Way Mirror Sync (`sync` ➔):** Keep the destination folder an exact mirror of the source, copying new files and automatically deleting destination files removed from the source.
+- **Continuous Polling Intervals:** Selectable continuous check intervals starting from 30 seconds (always-on loop) up to hourly schedules.
+- **Management Controls:** Dedicated "Sincronizzazioni" dashboard offering immediate manual triggers ("Sincronizza ora"), pause/resume toggling, and removal.
+
 ### 🔑 Frictionless Cloud Authentication
 - **1-Click Google Drive Pairing:** Native local helper daemon (`scripts/google_helper.py`) pairs Google Drive accounts via an ephemeral local callback listener (`127.0.0.1:53683`), eliminating cumbersome token pasting.
 - **Apple iCloud Drive (with 2FA):** Native support for Apple ID login, trusted device 2FA challenge responses, and session persistence.
