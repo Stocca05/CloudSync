@@ -74,6 +74,7 @@ def command(job, config, port, log_path):
         "2",
         "--checkers",
         "4",
+        "--check-first",
         "--rc",
         "--rc-addr",
         f"127.0.0.1:{port}",

@@ -23,6 +23,10 @@ def maintain(db, now=None):
     now = now or time.time()
     for job in db.scalars(select(Job).where(Job.status == "running", Job.lease_until < now)):
         failed_node = job.node_id or "sconosciuto"
+        curr_stats = dict(job.stats or {})
+        prev_cp = curr_stats.get("checkpoint_bytes", 0)
+        curr_b = curr_stats.get("bytes", 0)
+        checkpoint = max(prev_cp, curr_b)
         if job.cancel_requested:
             job.status = "cancelled"
             job.error = "Annullato dall'utente"
@@ -37,6 +41,7 @@ def maintain(db, now=None):
         job.lease_until = None
         job.node_id = None
         job.available_at = now + 2
+        job.stats = {"checkpoint_bytes": checkpoint} if checkpoint > 0 else {}
         if job.status != "queued":
             job.finished = now
     for schedule in db.scalars(select(Schedule).where(Schedule.enabled.is_(True), Schedule.next_run <= now)):
@@ -102,7 +107,12 @@ def claim(db, node, lease_seconds):
     query = (
         select(Job)
         .join(User, Job.user_id == User.id)
-        .where(Job.status == "queued", Job.available_at <= now, User.enabled.is_(True))
+        .where(
+            Job.status == "queued",
+            Job.available_at <= now,
+            User.enabled.is_(True),
+            (Job.node_id.is_(None) | (Job.node_id == node.id)),
+        )
     )
     if saturated:
         query = query.where(Job.user_id.not_in(saturated))
@@ -120,7 +130,8 @@ def claim(db, node, lease_seconds):
     job.finished = None
     job.attempts += 1
     job.error = ""
-    job.stats = {}
+    checkpoint = (job.stats or {}).get("checkpoint_bytes", 0)
+    job.stats = {"checkpoint_bytes": checkpoint} if checkpoint > 0 else {}
     db.get(User, job.user_id).last_dispatch = now
     db.flush()
     return job

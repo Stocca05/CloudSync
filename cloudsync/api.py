@@ -67,6 +67,10 @@ class JobPriority(BaseModel):
     priority: int = Field(ge=0, le=2)
 
 
+class JobReassign(BaseModel):
+    node_id: str | None = None
+
+
 class ClusterInput(BaseModel):
     global_bps: int = Field(ge=65536, le=2000000000)
     max_active_jobs: int = Field(ge=1, le=256)
@@ -613,6 +617,46 @@ def create_app(settings=None):
         db.commit()
         return {"ok": True}
 
+    @app.post("/api/admin/jobs/{job_id}/reassign")
+    def admin_reassign(job_id: str, data: JobReassign, user=Depends(admin), db: Session = Depends(get_db)):
+        lock_scheduler(db)
+        job = db.get(Job, job_id)
+        if not job:
+            raise HTTPException(404, "Lavoro non trovato")
+        if job.status in TERMINAL:
+            raise HTTPException(409, "Il lavoro è già terminato")
+
+        if data.node_id:
+            target = db.get(Node, data.node_id)
+            if not target or not target.enabled:
+                raise HTTPException(400, "Nodo di destinazione non valido o disattivato")
+
+        old_node = job.node_id or "coda"
+        curr_stats = dict(job.stats or {})
+        prev_checkpoint = curr_stats.get("checkpoint_bytes", 0)
+        current_run_bytes = curr_stats.get("bytes", 0)
+        new_checkpoint = max(prev_checkpoint, current_run_bytes)
+
+        # Invalidate lease to fence off old node
+        if job.status == "running":
+            job.cancel_requested = True
+            job.lease_token = None
+            job.lease_until = None
+
+        job.status = "queued"
+        job.cancel_requested = False
+        job.node_id = data.node_id
+        job.available_at = time.time()
+        job.stats = {
+            **curr_stats,
+            "checkpoint_bytes": new_checkpoint,
+            "speed": 0,
+        }
+        dest_label = f"nodo '{data.node_id}'" if data.node_id else "qualsiasi nodo libero"
+        job.error = f"Lavoro riassegnato a {dest_label}. Ripresa da checkpoint ({new_checkpoint} B già confermati)."
+        db.commit()
+        return {"ok": True, "node_id": data.node_id, "checkpoint_bytes": new_checkpoint}
+
     @app.get("/api/admin/cluster")
     def cluster(user=Depends(admin), db: Session = Depends(get_db)):
         cfg = db.get(ClusterConfig, 1)
@@ -729,11 +773,20 @@ def create_app(settings=None):
         lock_scheduler(db)
         job = leased(db, job_id, data.lease_token, node)
         job.lease_until = time.time() + settings.lease_seconds
-        job.stats = {
+        curr_stats = dict(job.stats or {})
+        checkpoint = curr_stats.get("checkpoint_bytes", 0)
+        reported = {
             k: data.stats[k]
             for k in ["bytes", "totalBytes", "speed", "eta", "transfers", "checks", "errors"]
             if isinstance(data.stats.get(k), (int, float))
         }
+        if checkpoint > 0:
+            reported["checkpoint_bytes"] = checkpoint
+            if "bytes" in reported:
+                reported["bytes"] += checkpoint
+            if "totalBytes" in reported and reported["totalBytes"] > 0:
+                reported["totalBytes"] += checkpoint
+        job.stats = reported
         node.last_seen = time.time()
         answer = db.get(AuthAnswer, job.id)
         if answer and data.ack_answer == answer.answer_id:
@@ -769,11 +822,20 @@ def create_app(settings=None):
     def complete(job_id: str, data: Completion, node=Depends(worker), db: Session = Depends(get_db)):
         lock_scheduler(db)
         job = leased(db, job_id, data.lease_token, node)
-        job.stats = {
+        curr_stats = dict(job.stats or {})
+        checkpoint = curr_stats.get("checkpoint_bytes", 0)
+        reported = {
             k: data.stats[k]
             for k in ["bytes", "totalBytes", "speed", "eta", "transfers", "checks", "errors"]
             if isinstance(data.stats.get(k), (int, float))
         }
+        if checkpoint > 0:
+            reported["checkpoint_bytes"] = checkpoint
+            if "bytes" in reported:
+                reported["bytes"] += checkpoint
+            if "totalBytes" in reported and reported["totalBytes"] > 0:
+                reported["totalBytes"] += checkpoint
+        job.stats = reported
         db.execute(delete(AuthAnswer).where(AuthAnswer.job_id == job.id))
         job.result = data.result
         job.error = data.error
