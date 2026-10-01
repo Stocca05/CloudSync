@@ -81,6 +81,11 @@ class AuthReply(BaseModel):
     answer: str = Field(max_length=2048)
 
 
+class ReleasePayload(BaseModel):
+    stats: dict = Field(default_factory=dict)
+    reason: str = "Worker shutdown"
+
+
 class Heartbeat(BaseModel):
     lease_token: str
     stats: dict = Field(default_factory=dict)
@@ -818,6 +823,27 @@ def create_app(settings=None):
         db.commit()
         return result
 
+    @app.post("/internal/jobs/{job_id}/release")
+    def release_job(job_id: str, data: ReleasePayload, node=Depends(worker), db: Session = Depends(get_db)):
+        lock_scheduler(db)
+        job = db.get(Job, job_id)
+        if not job or job.status != "running" or job.node_id != node.id:
+            return {"ok": True}
+        curr_stats = dict(job.stats or {})
+        prev_cp = curr_stats.get("checkpoint_bytes", 0)
+        curr_b = (data.stats or {}).get("bytes", 0)
+        checkpoint = max(prev_cp, prev_cp + curr_b)
+        job.stats = {**curr_stats, "checkpoint_bytes": checkpoint, "speed": 0}
+        job.status = "queued"
+        job.node_id = None
+        job.available_at = time.time()
+        job.lease_token = None
+        job.lease_until = None
+        job.finished = None
+        job.error = f"Nodo '{node.id}' arrestato: lavoro riassegnato immediatamente al prossimo nodo libero."
+        db.commit()
+        return {"ok": True, "requeued": True}
+
     @app.post("/internal/jobs/{job_id}/complete")
     def complete(job_id: str, data: Completion, node=Depends(worker), db: Session = Depends(get_db)):
         lock_scheduler(db)
@@ -843,9 +869,25 @@ def create_app(settings=None):
         job.finished = time.time()
         job.lease_token = None
         job.lease_until = None
-        if job.status == "failed" and not job.cancel_requested and job.attempts < job.max_attempts:
+
+        err_lower = (data.error or "").lower()
+        is_termination = (
+            "143" in err_lower
+            or "-15" in err_lower
+            or "sigterm" in err_lower
+            or "arresto" in err_lower
+            or "interrotto" in err_lower
+        )
+        if is_termination and not job.cancel_requested:
             job.status = "queued"
-            job.available_at = time.time() + 15 * job.attempts
+            job.node_id = None
+            job.available_at = time.time()
+            job.finished = None
+            job.error = f"Nodo '{node.id}' interrotto (codice 143): riassegnato immediatamente al prossimo nodo libero."
+        elif job.status == "failed" and not job.cancel_requested and job.attempts < job.max_attempts:
+            job.status = "queued"
+            job.node_id = None
+            job.available_at = time.time()
             job.finished = None
         for remote_id, update in data.refreshed.items():
             if remote_id not in {job.source_id, job.destination_id}:

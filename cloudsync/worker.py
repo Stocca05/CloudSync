@@ -225,6 +225,14 @@ def run_job(api_url, token, job):
             if ownership_lost:
                 log.warning("job %s stopped: lease unavailable", job_id)
                 return
+            if shutdown or (process and process.returncode in {143, -15}):
+                log.info("job %s releasing to cluster due to worker shutdown/signal", job_id)
+                try:
+                    payload["stats"] = read_progress(log_path)
+                    api.post(base + "/release", json={"stats": payload["stats"], "reason": "Worker shutdown"})
+                except Exception:
+                    pass
+                return
             payload["stats"] = read_progress(log_path)
             success = process.returncode == 0 and not cancelled and not shutdown
             result = result_listing(output_path) if success and job["operation"] == "list" else {}
