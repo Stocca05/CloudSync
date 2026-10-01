@@ -1,3 +1,4 @@
+import asyncio
 import secrets
 import time
 from contextlib import asynccontextmanager
@@ -125,7 +126,26 @@ def create_app(settings=None):
                 )
             if settings.bootstrap_worker_token and not db.get(Node, "local"):
                 db.add(Node(id="local", token_hash=digest(settings.bootstrap_worker_token)))
+
+        async def watchdog():
+            while True:
+                try:
+                    await asyncio.sleep(3)
+                    with factory.begin() as db:
+                        lock_scheduler(db)
+                        maintain(db)
+                except asyncio.CancelledError:
+                    break
+                except Exception:
+                    pass
+
+        watchdog_task = asyncio.create_task(watchdog())
         yield
+        watchdog_task.cancel()
+        try:
+            await watchdog_task
+        except asyncio.CancelledError:
+            pass
         engine.dispose()
 
     app = FastAPI(title="CloudSync", version="0.2.0", lifespan=lifespan)

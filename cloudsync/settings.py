@@ -17,7 +17,7 @@ class Settings:
     google_client_secret: str = field(default_factory=lambda: os.environ.get("GOOGLE_CLIENT_SECRET", ""))
     public_url: str = field(default_factory=lambda: os.environ.get("PUBLIC_URL", ""))
     session_seconds: int = 7 * 86400
-    lease_seconds: int = 90
+    lease_seconds: int = field(default_factory=lambda: int(os.environ.get("LEASE_SECONDS", "25")))
     global_bps: int = field(default_factory=lambda: int(os.environ.get("GLOBAL_BPS", "52428800")))
     max_active_jobs: int = field(default_factory=lambda: int(os.environ.get("MAX_ACTIVE_JOBS", "64")))
     max_pending_per_user: int = 200

@@ -22,17 +22,21 @@ def lock_scheduler(db):
 def maintain(db, now=None):
     now = now or time.time()
     for job in db.scalars(select(Job).where(Job.status == "running", Job.lease_until < now)):
-        job.status = (
-            "cancelled"
-            if job.cancel_requested
-            else ("queued" if job.attempts < job.max_attempts else "failed")
-        )
+        failed_node = job.node_id or "sconosciuto"
+        if job.cancel_requested:
+            job.status = "cancelled"
+            job.error = "Annullato dall'utente"
+        elif job.attempts < job.max_attempts:
+            job.status = "queued"
+            job.error = f"Nodo '{failed_node}' caduto o irraggiungibile: lavoro recuperato e riaccodato (tentativo {job.attempts}/{job.max_attempts})"
+        else:
+            job.status = "failed"
+            job.error = f"Fallito dopo {job.attempts} tentativi: nodi worker non raggiungibili"
         db.execute(delete(AuthAnswer).where(AuthAnswer.job_id == job.id))
-        job.error = "Worker non raggiungibile: esecuzione interrotta"
         job.lease_token = None
         job.lease_until = None
         job.node_id = None
-        job.available_at = now + 5
+        job.available_at = now + 2
         if job.status != "queued":
             job.finished = now
     for schedule in db.scalars(select(Schedule).where(Schedule.enabled.is_(True), Schedule.next_run <= now)):
