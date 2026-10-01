@@ -638,13 +638,48 @@ async function loadRemotes() {
   root.replaceChildren();
   if (!state.remotes.length) return empty(root, 'Nessun cloud collegato', 'Aggiungi il tuo primo provider (Google Drive, iCloud, S3, WebDAV, SFTP).');
   
+  const providerIcons = {
+    drive: '📁',
+    iclouddrive: '☁️',
+    s3: '🪣',
+    sftp: '🔒',
+    webdav: '🌐'
+  };
+
   for (const r of state.remotes) {
     const card = el('article', 'remote-card');
     card.append(
-      el('div', 'remote-icon', '◇'),
+      el('div', 'remote-icon', providerIcons[r.provider] || '◇'),
       el('h3', '', r.name),
       el('p', 'muted', state.providers[r.provider]?.label || r.provider)
     );
+
+    // Visual Storage & Quota Breakdown
+    const quotaBox = el('div', 'remote-quota-box');
+    quotaBox.id = `quota-box-${r.id}`;
+
+    const qHead = el('div', 'quota-head');
+    qHead.append(
+      el('span', 'quota-title', 'Spazio Cloud'),
+      button('↻', () => fetchRemoteQuota(r.id, true), 'quota-refresh-btn')
+    );
+
+    const qMeter = el('div', 'quota-meter');
+    const qFill = el('div', 'quota-meter-fill');
+    qFill.id = `quota-fill-${r.id}`;
+    qMeter.append(qFill);
+
+    const qSub = el('div', 'quota-sub');
+    const qUsed = el('span', 'quota-used', 'Controllo spazio…');
+    qUsed.id = `quota-used-${r.id}`;
+    const qBadge = el('span', 'quota-badge', '--');
+    qBadge.id = `quota-badge-${r.id}`;
+    qBadge.hidden = true;
+    qSub.append(qUsed, qBadge);
+
+    quotaBox.append(qHead, qMeter, qSub);
+    card.append(quotaBox);
+
     if (r.provider === 'iclouddrive') {
       card.append(
         button('Verifica / rinnova Apple', () => startApple(r.id)),
@@ -659,14 +694,10 @@ async function loadRemotes() {
       );
     }
     card.append(
-      button('Testa connessione', async () => {
+      button('Testa & Aggiorna Quota', async () => {
         toast('Verifica collegamento con ' + r.name + '…');
-        try {
-          const files = await api('/remotes/' + r.id + '/files?path=');
-          toast(`Connessione attiva a '${r.name}'! (${files.length} elementi nella radice) ✓`);
-        } catch (e) {
-          toast(`Errore connessione '${r.name}': ${e.message}`);
-        }
+        await fetchRemoteQuota(r.id, true);
+        toast(`Collegamento '${r.name}' verificato con successo! ✓`);
       }, 'secondary'),
       button('Esplora cartelle', async () => {
         $('source-remote').value = r.id;
@@ -682,6 +713,93 @@ async function loadRemotes() {
       }, 'quiet')
     );
     root.append(card);
+
+    // Initial background quota check
+    fetchRemoteQuota(r.id, false);
+  }
+}
+
+async function fetchRemoteQuota(remoteId, force = false) {
+  const fill = $(`quota-fill-${remoteId}`);
+  const usedEl = $(`quota-used-${remoteId}`);
+  const badgeEl = $(`quota-badge-${remoteId}`);
+  if (!usedEl) return;
+
+  if (force) {
+    usedEl.textContent = 'Aggiornamento…';
+    if (badgeEl) badgeEl.hidden = true;
+    if (fill) fill.style.width = '0%';
+  }
+
+  try {
+    let quotaData = null;
+    if (force) {
+      const job = await post(`/remotes/${remoteId}/quota`, {});
+      for (let i = 0; i < 40; i++) {
+        await new Promise(res => setTimeout(res, 800));
+        const res = await api('/jobs/' + job.id);
+        if (['completed', 'failed', 'cancelled'].includes(res.status)) {
+          quotaData = res.result;
+          break;
+        }
+      }
+    } else {
+      const res = await api(`/remotes/${remoteId}/quota`);
+      if (res.status === 'completed' && res.result) {
+        quotaData = res.result;
+      } else {
+        fetchRemoteQuota(remoteId, true);
+        return;
+      }
+    }
+
+    if (!quotaData || quotaData.supported === false) {
+      if (fill) fill.style.width = '0%';
+      usedEl.textContent = quotaData?.reason || 'Spazio non esposto via API';
+      usedEl.style.fontSize = '0.72rem';
+      usedEl.style.color = 'var(--text-muted)';
+      if (badgeEl) badgeEl.hidden = true;
+      return;
+    }
+
+    const total = quotaData.total;
+    const used = quotaData.used || 0;
+    const free = quotaData.free;
+
+    if (total && total > 0) {
+      const pct = Math.min(100, Math.round((used / total) * 100));
+      const colorClass = pct >= 90 ? 'danger' : pct >= 75 ? 'warn' : 'accent';
+      if (fill) {
+        fill.className = 'quota-meter-fill ' + colorClass;
+        fill.style.width = pct + '%';
+      }
+      usedEl.style.fontSize = '';
+      usedEl.style.color = '';
+      usedEl.textContent = `${bytes(used)} / ${bytes(total)}`;
+      if (badgeEl) {
+        badgeEl.hidden = false;
+        badgeEl.className = 'quota-badge ' + colorClass;
+        badgeEl.textContent = `${pct}%`;
+        badgeEl.title = free ? `${bytes(free)} liberi` : '';
+      }
+    } else if (used > 0) {
+      if (fill) {
+        fill.className = 'quota-meter-fill accent';
+        fill.style.width = '100%';
+      }
+      usedEl.textContent = `${bytes(used)} usati`;
+      if (badgeEl) {
+        badgeEl.hidden = false;
+        badgeEl.className = 'quota-badge accent';
+        badgeEl.textContent = 'Illimitato';
+      }
+    } else {
+      usedEl.textContent = 'Nessun dato di quota';
+      if (badgeEl) badgeEl.hidden = true;
+    }
+  } catch (err) {
+    usedEl.textContent = 'Quota non disponibile';
+    if (badgeEl) badgeEl.hidden = true;
   }
 }
 

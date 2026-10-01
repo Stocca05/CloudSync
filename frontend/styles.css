@@ -1211,6 +1211,117 @@ progress::-webkit-progress-value {
   color: var(--accent-light);
 }
 
+.remote-quota-box {
+  background: rgba(13, 21, 39, 0.55);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  padding: 0.75rem 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin: 0.35rem 0 0.5rem;
+}
+
+.quota-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.quota-title {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.quota-refresh-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 2px 5px;
+  font-size: 0.85rem;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  line-height: 1;
+}
+
+.quota-refresh-btn:hover {
+  color: var(--accent-light);
+  background: rgba(14, 165, 233, 0.15);
+}
+
+.quota-meter {
+  height: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 9999px;
+  overflow: hidden;
+  margin: 2px 0;
+}
+
+.quota-meter-fill {
+  height: 100%;
+  border-radius: 9999px;
+  width: 0%;
+  transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1), background 0.3s ease;
+}
+
+.quota-meter-fill.accent {
+  background: linear-gradient(90deg, #0ea5e9, #38bdf8);
+}
+
+.quota-meter-fill.warn {
+  background: linear-gradient(90deg, #d97706, #f59e0b);
+}
+
+.quota-meter-fill.danger {
+  background: linear-gradient(90deg, #e11d48, #f43f5e);
+}
+
+.quota-sub {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.76rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.quota-used {
+  color: var(--text-main);
+  font-weight: 500;
+}
+
+.quota-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-muted);
+}
+
+.quota-badge.accent {
+  background: rgba(14, 165, 233, 0.15);
+  color: var(--accent-light);
+}
+
+.quota-badge.warn {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+}
+
+.quota-badge.danger {
+  background: rgba(244, 63, 94, 0.15);
+  color: #fda4af;
+}
+
+.quota-free {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
 .node-stats-bar {
   display: flex;
   flex-direction: column;

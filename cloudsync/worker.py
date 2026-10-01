@@ -81,6 +81,8 @@ def command(job, config, port, log_path):
         "--bwlimit",
         str(job["bandwidth_bps"]) + "B",
     ]
+    if job["operation"] == "about":
+        return ["rclone", "about", "r" + job["source_id"] + ":", "--json", *common]
     if job["operation"] == "list":
         return ["rclone", "lsjson", source, "--no-mimetype", "--no-modtime", *common]
     if job["operation"] == "mkdir":
@@ -158,6 +160,33 @@ def result_listing(path):
         "items": [{k: item.get(k) for k in ["Path", "Name", "Size", "IsDir"]} for item in data[:1000]],
         "truncated": len(data) > 1000,
     }
+
+
+def result_about(path, err_path=None):
+    try:
+        text = (path.read_text() if path.exists() else "").strip()
+        if text:
+            data = json.loads(text)
+            if isinstance(data, dict) and any(k in data for k in ["total", "used", "free"]):
+                return {
+                    "supported": True,
+                    "total": data.get("total"),
+                    "used": data.get("used"),
+                    "free": data.get("free"),
+                    "trashed": data.get("trashed"),
+                }
+    except Exception:
+        pass
+    reason = "Quota non disponibile per questo provider"
+    if err_path and err_path.exists():
+        err_text = err_path.read_text().strip()
+        if "doesn't support about" in err_text:
+            reason = "Il provider non supporta la lettura quote via API"
+        elif err_text:
+            lines = [l for l in err_text.splitlines() if l.strip()]
+            if lines:
+                reason = lines[-1]
+    return {"supported": False, "reason": reason}
 
 
 def run_job(api_url, token, job):
@@ -294,7 +323,13 @@ def run_job(api_url, token, job):
                         STOP.wait(3)
             payload["stats"] = read_progress(log_path)
             success = process.returncode == 0 and not cancelled and not shutdown
-            result = result_listing(output_path) if success and job["operation"] == "list" else {}
+            if job["operation"] == "about":
+                success = not cancelled and not shutdown
+                result = result_about(output_path, root / "stderr")
+            elif success and job["operation"] == "list":
+                result = result_listing(output_path)
+            else:
+                result = {}
             refreshed = {}
             saved = configparser.ConfigParser(interpolation=None)
             saved.read(config)

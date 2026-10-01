@@ -38,7 +38,7 @@ class JobInput(BaseModel):
     destination_id: str | None = None
     source_path: str = ""
     destination_path: str = ""
-    operation: Literal["list", "copy", "move", "mkdir", "delete", "sync", "bisync"] = "copy"
+    operation: Literal["list", "copy", "move", "mkdir", "delete", "sync", "bisync", "about"] = "copy"
     is_file: bool = False
     priority: int = Field(default=0, ge=0, le=2)
     confirm_move: bool = False
@@ -460,6 +460,70 @@ def create_app(settings=None):
         db.commit()
         return job_view(job)
 
+    @app.get("/api/remotes/{remote_id}/quota")
+    def get_remote_quota(remote_id: str, user=Depends(current_user), db: Session = Depends(get_db)):
+        remote = owned(db, Remote, remote_id, user)
+        last_job = db.scalar(
+            select(Job)
+            .where(
+                Job.source_id == remote_id,
+                Job.operation == "about",
+                Job.status == "completed",
+            )
+            .order_by(Job.finished.desc())
+            .limit(1)
+        )
+        if last_job and (time.time() - (last_job.finished or 0) < 600):
+            return {"job_id": last_job.id, "status": "completed", "result": last_job.result}
+
+        active_job = db.scalar(
+            select(Job)
+            .where(
+                Job.source_id == remote_id,
+                Job.operation == "about",
+                Job.status.in_(["queued", "running"]),
+            )
+            .order_by(Job.created.desc())
+            .limit(1)
+        )
+        if active_job:
+            return {"job_id": active_job.id, "status": active_job.status}
+
+        return {"job_id": None, "status": "none"}
+
+    @app.post("/api/remotes/{remote_id}/quota", status_code=201)
+    def refresh_remote_quota(remote_id: str, user=Depends(current_user), db: Session = Depends(get_db)):
+        lock_scheduler(db)
+        remote = owned(db, Remote, remote_id, user)
+        if remote.provider == "iclouddrive":
+            conf = vault.decrypt(remote.encrypted_config)
+            if not conf.get("trust_token"):
+                raise HTTPException(409, "Completa prima la connessione iCloud e il codice 2FA")
+
+        existing = db.scalar(
+            select(Job)
+            .where(
+                Job.source_id == remote_id,
+                Job.operation == "about",
+                Job.status.in_(["queued", "running"]),
+            )
+            .order_by(Job.created.desc())
+            .limit(1)
+        )
+        if existing:
+            return job_view(existing)
+
+        job = Job(
+            user_id=user.id,
+            source_id=remote_id,
+            operation="about",
+            priority=2,
+            max_attempts=1,
+        )
+        db.add(job)
+        db.commit()
+        return job_view(job)
+
     @app.post("/api/jobs/{job_id}/answer")
     def answer_challenge(
         job_id: str, data: AuthReply, user=Depends(current_user), db: Session = Depends(get_db)
@@ -511,7 +575,7 @@ def create_app(settings=None):
             job_view(j)
             for j in db.scalars(
                 select(Job)
-                .where(Job.user_id == user.id, Job.operation != "list")
+                .where(Job.user_id == user.id, Job.operation.notin_(["list", "about"]))
                 .order_by(Job.created.desc())
                 .limit(200)
             )
