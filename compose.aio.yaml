@@ -1,0 +1,20 @@
+name: cloudsync-aio
+
+services:
+  cloudsync:
+    build: .
+    image: cloudsync:latest
+    container_name: cloudsync
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8080}:8000"
+    volumes:
+      - cloudsync-data:/data
+    environment:
+      - ADMIN_USER=${ADMIN_USER:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
+      - COOKIE_SECURE=${COOKIE_SECURE:-false}
+      - ALLOW_REGISTRATION=${ALLOW_REGISTRATION:-true}
+
+volumes:
+  cloudsync-data:

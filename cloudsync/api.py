@@ -108,7 +108,12 @@ def create_app(settings=None):
     settings = settings or Settings()
     if not settings.database_url or not settings.encryption_key:
         raise RuntimeError("DATABASE_URL ed ENCRYPTION_KEY richiesti. Avvia con ./start")
-    engine = create_engine(settings.database_url, pool_pre_ping=True, pool_size=20, max_overflow=20, pool_timeout=30, pool_recycle=1800)
+    engine_kwargs = {"pool_pre_ping": True}
+    if settings.database_url.startswith("sqlite"):
+        engine_kwargs["connect_args"] = {"timeout": 30, "check_same_thread": False}
+    else:
+        engine_kwargs.update(pool_size=20, max_overflow=20, pool_timeout=30, pool_recycle=1800)
+    engine = create_engine(settings.database_url, **engine_kwargs)
     factory = sessionmaker(engine, expire_on_commit=False)
     vault = Vault(settings.encryption_key)
 
@@ -117,6 +122,9 @@ def create_app(settings=None):
         with engine.begin() as connection:
             if engine.dialect.name == "postgresql":
                 connection.execute(text("SELECT pg_advisory_xact_lock(73420124)"))
+            elif engine.dialect.name == "sqlite":
+                connection.execute(text("PRAGMA journal_mode=WAL;"))
+                connection.execute(text("PRAGMA synchronous=NORMAL;"))
             Base.metadata.create_all(connection)
         with factory.begin() as db:
             lock_scheduler(db)
