@@ -562,11 +562,67 @@ function renderJobs() {
         }, 'quiet')
       );
     }
+    actions.append(button('Dettagli', () => openJobDetail(j), 'secondary'));
 
     foot.append(opInfo, actions);
     row.append(foot);
     root.append(row);
   }
+}
+
+function openJobDetail(j) {
+  const st = j.stats || {};
+  const pct = Math.round(Number(j.percent) || (st.totalBytes ? Math.min(100, (st.bytes / st.totalBytes) * 100) : (j.status === 'completed' ? 100 : 0)));
+  
+  if ($('job-detail-id')) $('job-detail-id').textContent = '#' + j.id.slice(0, 8);
+  if ($('job-detail-status')) {
+    $('job-detail-status').className = 'badge ' + j.status;
+    $('job-detail-status').textContent = labels[j.status] || j.status;
+  }
+  if ($('job-detail-op')) $('job-detail-op').textContent = `${operationLabels[j.operation] || j.operation} · ID: ${j.id}`;
+  
+  const srcName = remoteName(j.source_id);
+  const dstName = j.destination_id ? remoteName(j.destination_id) : '';
+  if ($('job-detail-source')) $('job-detail-source').textContent = (srcName ? srcName + ':' : '') + (j.source_path || '/');
+  if ($('job-detail-dest')) $('job-detail-dest').textContent = dstName ? (dstName + ':' + (j.destination_path || '/')) : 'N/D';
+  
+  if ($('job-detail-pct')) $('job-detail-pct').textContent = pct + '%';
+  if ($('job-detail-bytes')) $('job-detail-bytes').textContent = `${bytes(st.bytes || 0)} / ${st.totalBytes ? bytes(st.totalBytes) : 'sconosciuto'}`;
+  if ($('job-detail-speed')) $('job-detail-speed').textContent = bytes(st.speed || 0) + '/s';
+  if ($('job-detail-quota')) $('job-detail-quota').textContent = j.assigned_bps ? bytes(j.assigned_bps) + '/s' : 'Illimitata';
+  if ($('job-detail-node')) $('job-detail-node').textContent = j.node_id ? `Nodo: ${j.node_id}` : 'In attesa di assegnazione';
+  if ($('job-detail-eta')) $('job-detail-eta').textContent = formatDuration(st.eta);
+  if ($('job-detail-attempts')) $('job-detail-attempts').textContent = `${j.attempts || 1} / ${j.max_attempts || 3}`;
+  if ($('job-detail-checkpoint')) $('job-detail-checkpoint').textContent = bytes(st.checkpoint_bytes || 0);
+  
+  const errBox = $('job-detail-error');
+  if (errBox) {
+    if (j.error) {
+      errBox.textContent = 'Errore: ' + j.error;
+      errBox.hidden = false;
+    } else {
+      errBox.hidden = true;
+    }
+  }
+  
+  const retryBtn = $('job-detail-retry');
+  if (retryBtn) {
+    if (['failed', 'cancelled'].includes(j.status)) {
+      retryBtn.hidden = false;
+      retryBtn.onclick = async () => {
+        const endpoint = state.page === 'admin' ? '/admin/jobs/' : '/jobs/';
+        await post(endpoint + j.id + '/retry');
+        $('job-detail-dialog').close();
+        toast('Trasferimento riavviato.');
+        await refresh();
+        if (state.page === 'admin') await loadAdminJobs();
+      };
+    } else {
+      retryBtn.hidden = true;
+    }
+  }
+  
+  $('job-detail-dialog').showModal();
 }
 
 // Remotes Management
@@ -603,6 +659,15 @@ async function loadRemotes() {
       );
     }
     card.append(
+      button('Testa connessione', async () => {
+        toast('Verifica collegamento con ' + r.name + '…');
+        try {
+          const files = await api('/remotes/' + r.id + '/files?path=');
+          toast(`Connessione attiva a '${r.name}'! (${files.length} elementi nella radice) ✓`);
+        } catch (e) {
+          toast(`Errore connessione '${r.name}': ${e.message}`);
+        }
+      }, 'secondary'),
       button('Esplora cartelle', async () => {
         $('source-remote').value = r.id;
         await page('explorer');
@@ -1053,12 +1118,7 @@ async function loadAdmin(full = true) {
   state.cluster = data;
   state.clusterNodes = data.nodes;
 
-  if (full) {
-    $('global-bandwidth').value = Math.round(data.global_bps / 1048576);
-    $('max-active').value = data.max_active_jobs;
-  }
-
-  // Update Hero Metrics
+  // Always update Hero Metrics in-place
   const onlineCount = data.online_nodes ?? data.nodes.filter(n => n.online).length;
   const totalNodesCount = data.total_nodes ?? data.nodes.length;
   const onlinePct = totalNodesCount > 0 ? Math.round((onlineCount / totalNodesCount) * 100) : 0;
@@ -1088,28 +1148,53 @@ async function loadAdmin(full = true) {
   if ($('admin-metric-health-sub')) $('admin-metric-health-sub').textContent = `${data.completed_jobs || 0} completati · ${data.failed_jobs || 0} falliti`;
   if ($('admin-bar-health')) $('admin-bar-health').style.width = `${successRate}%`;
 
-  // Render Nodes Grid
+  // During 1.5s background polling, do not wipe out active DOM elements!
+  if (!full) return;
+
+  if ($('global-bandwidth') && !document.activeElement?.id?.includes('global-bandwidth')) {
+    $('global-bandwidth').value = Math.round(data.global_bps / 1048576);
+  }
+  if ($('max-active') && !document.activeElement?.id?.includes('max-active')) {
+    $('max-active').value = data.max_active_jobs;
+  }
+
+  renderNodes(data.nodes);
+  renderUsers(data.users);
+  renderEvents();
+  await loadAdminJobs();
+}
+
+function renderNodes(nodesList) {
   const nodes = $('nodes');
+  if (!nodes) return;
   nodes.replaceChildren();
-  for (const n of data.nodes) {
+  for (const n of nodesList) {
     const card = el('article', 'remote-card');
     const isOnline = n.online ?? (Date.now() / 1000 - n.last_seen < 25 && n.enabled);
-    const lastSeenSec = Math.max(0, Math.round(Date.now() / 1000 - n.last_seen));
+    const lastSeenSec = n.last_seen > 0 ? Math.max(0, Math.round(Date.now() / 1000 - n.last_seen)) : null;
     const slotUsage = n.slots_used_pct ?? Math.round(((n.active_jobs || 0) / n.slots) * 100);
 
-    card.append(
+    const head = el('div', 'job-head');
+    head.append(
       el('div', 'remote-icon', '⌘'),
-      el('h3', '', n.id),
-      el('div', 'kpi-sub', isOnline ? `🟢 Online (${lastSeenSec}s fa)` : (!n.enabled ? '🟡 In Manutenzione' : '🔴 Non connesso'))
+      el('span', 'badge ' + (isOnline ? 'completed' : (!n.enabled ? 'cancelled' : 'failed')),
+        isOnline ? '🟢 Online' : (!n.enabled ? '🟡 Manutenzione' : '🔴 Non connesso'))
     );
+    card.append(head);
+    card.append(el('h3', '', n.id));
+    card.append(el('p', 'muted', lastSeenSec !== null ? `Ultimo heartbeat: ${lastSeenSec}s fa` : 'Nessun heartbeat recente'));
+
+    const meterBar = el('div', 'node-meter');
+    const meterFill = el('div', 'node-meter-fill');
+    meterFill.style.width = `${slotUsage}%`;
+    meterBar.append(meterFill);
 
     const meters = el('div', 'node-stats-bar');
     meters.append(
       el('span', '', `Slot: ${n.active_jobs || 0} / ${n.slots} occupati (${slotUsage}%)`),
-      el('div', 'node-meter').appendChild(el('div', 'node-meter-fill', '')).parentNode,
+      meterBar,
       el('span', '', `Banda allocata: ${bytes(n.bandwidth_bps)}/s`)
     );
-    meters.querySelector('.node-meter-fill').style.width = `${slotUsage}%`;
     card.append(meters);
 
     const btnToolbar = el('div', 'job-actions');
@@ -1141,14 +1226,13 @@ async function loadAdmin(full = true) {
     card.append(btnToolbar);
     nodes.append(card);
   }
+}
 
-  await loadAdminJobs();
-  if (!full) return;
-
-  // Render Users Stack
+function renderUsers(usersList) {
   const users = $('users');
+  if (!users) return;
   users.replaceChildren();
-  for (const u of data.users) {
+  for (const u of usersList) {
     const row = el('div', 'panel user-row');
     const uInfo = el('div', 'user-info');
     const uTitle = el('h3', '', u.username);
@@ -1170,8 +1254,6 @@ async function loadAdmin(full = true) {
     row.append(uInfo, uMeta, uActions);
     users.append(row);
   }
-
-  renderEvents();
 }
 
 function openEditNode(node) {
@@ -1279,11 +1361,16 @@ $('node-form').onsubmit = e => {
 };
 
 async function loadAdminJobs() {
-  const filter = $('admin-job-filter').value;
+  const filter = $('admin-job-filter')?.value || '';
   const data = await api('/admin/jobs?offset=' + adminJobOffset + '&status=' + encodeURIComponent(filter));
   const root = $('admin-jobs');
+  if (!root) return;
   if (root.contains(document.activeElement)) return;
   root.replaceChildren();
+
+  $('admin-jobs-prev').disabled = adminJobOffset === 0;
+  $('admin-jobs-next').disabled = !data.has_more;
+  $('admin-jobs-page').textContent = 'Pagina ' + (Math.floor(adminJobOffset / 100) + 1);
 
   if (!data.items.length) {
     empty(root, 'Nessun processo trovato', 'Non ci sono trasferimenti per questo filtro.');
@@ -1291,17 +1378,37 @@ async function loadAdminJobs() {
   }
 
   for (const j of data.items) {
-    const row = el('article', 'job');
-    const info = el('div');
-    info.append(
-      el('h3', '', `${j.username} · ${operationLabels[j.operation] || j.operation} · ID: ${j.id.slice(0, 8)}`),
-      el('p', 'job-paths', `${j.source_path || '/'} ➔ ${j.destination_path || '/'}`),
-      el('p', '', `${labels[j.status]} · Nodo: ${j.node_id || 'in attesa'}`),
-      el('p', 'muted', `${bytes(j.stats?.bytes || 0)} trasferiti · Velocità: ${bytes(j.stats?.speed || 0)}/s · Quota: ${bytes(j.assigned_bps)}/s`)
-    );
-    if (j.error) info.append(el('p', 'error', j.error));
+    const row = el('article', 'job status-' + j.status);
+    const head = el('div', 'job-head');
+    const titleGroup = el('div', 'job-title-group');
+    const icon = el('div', 'job-icon', j.operation === 'sync' ? '➔' : (j.operation === 'bisync' ? '⇄' : '◇'));
+    const headTitles = el('div');
+    const title = el('h3', '', `${j.username} · ${operationLabels[j.operation] || j.operation}`);
+    title.append(el('span', 'route-pill', `ID: ${j.id.slice(0, 8)}`));
+    const pathSub = el('div', 'job-paths', `${j.source_path || '/'} ➔ ${j.destination_path || '/'}`);
+    headTitles.append(title, pathSub);
+    titleGroup.append(icon, headTitles);
 
+    const badgeGroup = el('div', 'job-actions');
+    const badge = el('span', `badge ${j.status}`, labels[j.status] || j.status);
+    badgeGroup.append(badge);
+    head.append(titleGroup, badgeGroup);
+    row.append(head);
+
+    const telem = el('div', 'job-telemetry');
+    telem.append(
+      el('span', 'telem-pill', `Nodo: ${j.node_id || 'in attesa'}`),
+      el('span', 'telem-pill', `Trasferiti: ${bytes(j.stats?.bytes || 0)}`),
+      el('span', 'telem-pill', `Velocità: ${bytes(j.stats?.speed || 0)}/s`),
+      el('span', 'telem-pill', `Quota: ${bytes(j.assigned_bps)}/s`)
+    );
+    row.append(telem);
+
+    if (j.error) row.append(el('p', 'error', j.error));
+
+    const foot = el('div', 'job-foot');
     const actions = el('div', 'job-actions');
+
     if (['queued', 'running'].includes(j.status)) {
       const select = el('select');
       select.setAttribute('aria-label', 'Priorità processo ' + j.id);
@@ -1319,7 +1426,7 @@ async function loadAdminJobs() {
 
       actions.append(
         select,
-        button('Salva priorità', async () => {
+        button('Priorità', async () => {
           await api('/admin/jobs/' + j.id, { method: 'PATCH', body: JSON.stringify({ priority: Number(select.value) }) });
           toast('Priorità aggiornata.');
         }),
@@ -1345,20 +1452,45 @@ async function loadAdminJobs() {
           }
         }, 'quiet')
       );
+    } else {
+      actions.append(button('Rimuovi dallo storico', async () => {
+        await api('/jobs/' + j.id, { method: 'DELETE' });
+        toast('Processo eliminato dallo storico.');
+        logEvent('info', `Processo ${j.id.slice(0, 8)} eliminato`);
+        await loadAdminJobs();
+      }, 'quiet'));
     }
-    row.append(info, actions);
+
+    foot.append(el('div'), actions);
+    row.append(foot);
     root.append(row);
   }
-
-  $('admin-jobs-prev').disabled = adminJobOffset === 0;
-  $('admin-jobs-next').disabled = !data.has_more;
-  $('admin-jobs-page').textContent = 'Pagina ' + (adminJobOffset / 100 + 1);
 }
 
 $('admin-job-filter').onchange = () => {
   adminJobOffset = 0;
   guard(loadAdminJobs);
 };
+if ($('admin-refresh-jobs')) {
+  $('admin-refresh-jobs').onclick = () => {
+    guard(loadAdminJobs);
+  };
+}
+if ($('admin-purge-jobs')) {
+  $('admin-purge-jobs').onclick = () => guard(async () => {
+    if (!confirm('Eliminare dallo storico tutti i processi completati, falliti o annullati?')) return;
+    const res = await post('/admin/jobs/purge', {});
+    toast(`Storico ripulito: ${res.purged} processi rimossi.`);
+    logEvent('warn', `Storico processi ripulito da admin: ${res.purged} eliminati`);
+    await loadAdminJobs();
+  });
+}
+if ($('admin-full-refresh')) {
+  $('admin-full-refresh').onclick = () => guard(async () => {
+    await loadAdmin(true);
+    toast('Cluster aggiornato.');
+  });
+}
 $('admin-jobs-prev').onclick = () => {
   adminJobOffset = Math.max(0, adminJobOffset - 100);
   guard(loadAdminJobs);
@@ -1460,11 +1592,13 @@ if (googleResult) {
   }[googleResult] || 'Accesso Google terminato.');
 }
 
-try {
-  const options = await api('/auth/options');
-  $('register').hidden = !options.registration;
-  await enter();
-  if (googleResult === 'connected') await page('remotes');
-} catch {
-  // Login is the initial screen when no session exists
-}
+(async () => {
+  try {
+    const options = await api('/auth/options');
+    $('register').hidden = !options.registration;
+    await enter();
+    if (googleResult === 'connected') await page('remotes');
+  } catch {
+    // Login is the initial screen when no session exists
+  }
+})();

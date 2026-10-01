@@ -16,7 +16,8 @@ TERMINAL = ("completed", "failed", "cancelled")
 
 def lock_scheduler(db):
     if db.bind.dialect.name == "postgresql":
-        db.execute(text("SELECT pg_advisory_xact_lock(73420125)"))
+        with db.no_autoflush:
+            db.execute(text("SELECT pg_advisory_xact_lock(73420125)"))
 
 
 def maintain(db, now=None):

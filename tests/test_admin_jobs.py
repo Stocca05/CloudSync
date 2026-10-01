@@ -89,3 +89,35 @@ def test_user_management_and_job_deletion(client, app, tmp_path):
     assert client.delete(f"/api/jobs/{job['id']}").status_code == 200
     assert not any(j["id"] == job["id"] for j in client.get("/api/jobs").json())
 
+
+def test_admin_retry_delete_and_purge(client, app, tmp_path):
+    login(client)
+    ids = seed_remotes(app, "admin", tmp_path)
+    job = client.post("/api/jobs", json={"source_id": ids[0], "destination_id": ids[1]}).json()
+
+    # Cancel the job
+    client.post(f"/api/jobs/{job['id']}/cancel")
+
+    # Admin retry
+    res_retry = client.post(f"/api/admin/jobs/{job['id']}/retry")
+    assert res_retry.status_code == 200
+    assert res_retry.json()["status"] == "queued"
+
+    # Cancel again
+    client.post(f"/api/admin/jobs/{job['id']}/cancel")
+
+    # Admin delete single
+    res_del = client.delete(f"/api/admin/jobs/{job['id']}")
+    assert res_del.status_code == 200
+
+    # Test purge
+    j1 = client.post("/api/jobs", json={"source_id": ids[0], "destination_id": ids[1]}).json()
+    j2 = client.post("/api/jobs", json={"source_id": ids[0], "destination_id": ids[1]}).json()
+    client.post(f"/api/jobs/{j1['id']}/cancel")
+    client.post(f"/api/jobs/{j2['id']}/cancel")
+
+    res_purge = client.post("/api/admin/jobs/purge")
+    assert res_purge.status_code == 200
+    assert res_purge.json()["purged"] >= 2
+
+

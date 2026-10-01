@@ -984,6 +984,19 @@ progress::-webkit-progress-value {
   align-items: center;
   gap: 0.5rem;
 }
+.job-actions select {
+  height: 32px;
+  padding: 0.2rem 0.6rem;
+  font-size: 0.8rem;
+  border-radius: var(--radius-xs);
+  background: rgba(13, 21, 39, 0.85);
+  border: 1px solid var(--border-light);
+  color: var(--text-main);
+  outline: none;
+}
+.job-actions select:focus {
+  border-color: var(--accent);
+}
 
 /* =========================================
    Explorer & Dual-Pane File Manager

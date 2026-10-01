@@ -696,6 +696,47 @@ def create_app(settings=None):
         db.commit()
         return {"ok": True, "node_id": data.node_id, "checkpoint_bytes": new_checkpoint}
 
+    @app.post("/api/admin/jobs/{job_id}/retry")
+    def admin_retry_job(job_id: str, user=Depends(admin), db: Session = Depends(get_db)):
+        lock_scheduler(db)
+        job = db.get(Job, job_id)
+        if not job:
+            raise HTTPException(404, "Lavoro non trovato")
+        if job.status not in {"failed", "cancelled"}:
+            raise HTTPException(409, "Il lavoro non può essere riavviato")
+        job.status = "queued"
+        job.attempts = 0
+        job.cancel_requested = False
+        job.available_at = time.time()
+        job.finished = None
+        job.error = ""
+        job.lease_token = None
+        job.lease_until = None
+        db.commit()
+        return job_view(job)
+
+    @app.delete("/api/admin/jobs/{job_id}")
+    def admin_delete_job(job_id: str, user=Depends(admin), db: Session = Depends(get_db)):
+        lock_scheduler(db)
+        job = db.get(Job, job_id)
+        if not job:
+            raise HTTPException(404, "Lavoro non trovato")
+        if job.status in {"queued", "running"}:
+            raise HTTPException(400, "Annulla prima il lavoro prima di eliminarlo dalla cronologia")
+        db.delete(job)
+        db.commit()
+        return {"ok": True}
+
+    @app.post("/api/admin/jobs/purge")
+    def admin_purge_jobs(user=Depends(admin), db: Session = Depends(get_db)):
+        lock_scheduler(db)
+        result = db.execute(
+            delete(Job).where(Job.status.in_(["completed", "failed", "cancelled"]))
+        )
+        count = result.rowcount
+        db.commit()
+        return {"ok": True, "purged": count}
+
     @app.get("/api/admin/cluster")
     def cluster(user=Depends(admin), db: Session = Depends(get_db)):
         cfg = db.get(ClusterConfig, 1)
@@ -850,6 +891,7 @@ def create_app(settings=None):
 
     @app.post("/internal/claim")
     def worker_claim(node=Depends(worker), db: Session = Depends(get_db)):
+        lock_scheduler(db)
         node.last_seen = time.time()
         job = claim(db, node, settings.lease_seconds)
         if not job:

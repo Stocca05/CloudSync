@@ -353,6 +353,9 @@
           <h1>Amministrazione Cluster</h1>
           <p class="muted">Centro di comando distribuito: monitoraggio nodi, bilanciamento banda, gestione utenti e audit log.</p>
         </div>
+        <div class="heading-actions">
+          <button id="admin-full-refresh" class="secondary">↻ Aggiorna cluster</button>
+        </div>
       </div>
 
       <!-- Cluster Telemetry Hero Cards -->
@@ -452,7 +455,7 @@
           <h2>Monitoraggio Tutti i Processi</h2>
           <span class="muted">Ispeziona, migra nodi in tempo reale o interrompi trasferimenti su scala globale</span>
         </div>
-        <div class="filter-mini">
+        <div class="filter-mini" style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;">
           <select id="admin-job-filter" aria-label="Filtra processi">
             <option value="">Tutti gli stati</option>
             <option value="running">In corso</option>
@@ -461,6 +464,8 @@
             <option value="completed">Completati</option>
             <option value="cancelled">Annullati</option>
           </select>
+          <button id="admin-refresh-jobs" class="secondary" title="Ricarica processi" style="height:32px;padding:0 0.65rem;">↻</button>
+          <button id="admin-purge-jobs" class="quiet" title="Elimina dallo storico tutti i processi terminati" style="height:32px;padding:0 0.65rem;color:var(--color-failed);border:1px solid rgba(244,63,94,0.3);">🗑 Pulisci terminati</button>
         </div>
       </div>
       <p class="notice">La priorità ordina i lavori dello stesso utente e assegna più banda ai lavori attivi. È possibile migrare qualsiasi lavoro a caldo verso un altro nodo dal menu dedicato.</p>
@@ -617,6 +622,40 @@
       <button id="apple-submit" class="primary" hidden>Invia codice verifica</button>
     </div>
   </form>
+</dialog>
+
+<!-- Dialog: Detailed Job Telemetry & Inspector -->
+<dialog id="job-detail-dialog">
+  <div class="dialog-title">
+    <h2>Dettagli Processo <span id="job-detail-id" class="route-pill"></span></h2>
+    <button class="quiet" type="button" data-close="job-detail-dialog" aria-label="Chiudi">✕</button>
+  </div>
+  <div class="job-detail-body">
+    <div class="job-detail-head" style="display:flex;align-items:center;gap:0.75rem;margin-bottom:0.75rem;">
+      <span class="badge" id="job-detail-status">Stato</span>
+      <span class="muted" id="job-detail-op">Operazione</span>
+    </div>
+    <div class="job-detail-route panel" style="padding:0.75rem;margin-bottom:0.85rem;display:flex;align-items:center;gap:0.5rem;font-size:0.85rem;font-family:var(--font-mono);word-break:break-all;">
+      <span id="job-detail-source">Sorgente</span>
+      <span style="color:var(--accent-light);">➔</span>
+      <span id="job-detail-dest">Destinazione</span>
+    </div>
+    <div class="job-detail-grid" style="display:grid;grid-template-columns:repeat(2,1fr);gap:0.65rem;margin-bottom:1rem;">
+      <div class="detail-item panel" style="padding:0.6rem 0.75rem;"><span class="muted" style="display:block;font-size:0.7rem;">Avanzamento</span><strong id="job-detail-pct" style="font-size:1.1rem;font-variant-numeric:tabular-nums;">0%</strong></div>
+      <div class="detail-item panel" style="padding:0.6rem 0.75rem;"><span class="muted" style="display:block;font-size:0.7rem;">Byte trasferiti</span><strong id="job-detail-bytes" style="font-size:1.1rem;font-variant-numeric:tabular-nums;">0 B</strong></div>
+      <div class="detail-item panel" style="padding:0.6rem 0.75rem;"><span class="muted" style="display:block;font-size:0.7rem;">Velocità attuale</span><strong id="job-detail-speed" style="font-size:1.1rem;font-variant-numeric:tabular-nums;">0 B/s</strong></div>
+      <div class="detail-item panel" style="padding:0.6rem 0.75rem;"><span class="muted" style="display:block;font-size:0.7rem;">Quota banda</span><strong id="job-detail-quota" style="font-size:1.1rem;font-variant-numeric:tabular-nums;">0 B/s</strong></div>
+      <div class="detail-item panel" style="padding:0.6rem 0.75rem;"><span class="muted" style="display:block;font-size:0.7rem;">Nodo assegnato</span><strong id="job-detail-node" style="font-size:0.95rem;">Nessuno</strong></div>
+      <div class="detail-item panel" style="padding:0.6rem 0.75rem;"><span class="muted" style="display:block;font-size:0.7rem;">Tempo stimato (ETA)</span><strong id="job-detail-eta" style="font-size:0.95rem;">--</strong></div>
+      <div class="detail-item panel" style="padding:0.6rem 0.75rem;"><span class="muted" style="display:block;font-size:0.7rem;">Tentativi eseguiti</span><strong id="job-detail-attempts" style="font-size:0.95rem;">1</strong></div>
+      <div class="detail-item panel" style="padding:0.6rem 0.75rem;"><span class="muted" style="display:block;font-size:0.7rem;">Checkpoint byte</span><strong id="job-detail-checkpoint" style="font-size:0.95rem;">0 B</strong></div>
+    </div>
+    <div id="job-detail-error" class="error panel" style="padding:0.75rem;margin-bottom:1rem;background:rgba(244,63,94,0.1);border-color:rgba(244,63,94,0.3);" hidden></div>
+  </div>
+  <div class="dialog-actions">
+    <button class="secondary" type="button" data-close="job-detail-dialog">Chiudi</button>
+    <button id="job-detail-retry" class="primary" hidden>Riprova trasferimento ↻</button>
+  </div>
 </dialog>
 
 <!-- Template: Empty State -->
