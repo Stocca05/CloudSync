@@ -60,6 +60,46 @@ def test_real_rclone_transfer_and_listing(app, client, tmp_path):
         result = client.get("/api/jobs/" + listing["id"]).json()
         assert result["status"] == "completed", result
         assert {i["Name"] for i in result["result"]["items"]} == {"example.bin", "nested"}
+
+        def execute(spec):
+            response = client.post("/api/jobs", json=spec)
+            assert response.status_code == 201, response.text
+            assigned = client.post(
+                "/internal/claim", headers={"Authorization": "Bearer worker-secret"}
+            ).json()["job"]
+            run_job(f"http://127.0.0.1:{port}", "worker-secret", assigned)
+            completed = client.get("/api/jobs/" + assigned["id"]).json()
+            assert completed["status"] == "completed", completed
+
+        execute({"source_id": ids[1], "operation": "mkdir", "source_path": "new folder"})
+        assert (destination / "new folder").is_dir()
+        execute(
+            {
+                "source_id": ids[0],
+                "destination_id": ids[1],
+                "operation": "move",
+                "source_path": "nested/hello.txt",
+                "destination_path": "new folder/moved.txt",
+                "is_file": True,
+                "confirm_move": True,
+            }
+        )
+        assert not (source / "nested/hello.txt").exists()
+        assert (destination / "new folder/moved.txt").read_text() == "Ciao dal cluster"
+        execute(
+            {
+                "source_id": ids[1],
+                "operation": "delete",
+                "source_path": "new folder/moved.txt",
+                "is_file": True,
+                "confirm_delete": True,
+            }
+        )
+        assert not (destination / "new folder/moved.txt").exists()
+        execute({"source_id": ids[1], "operation": "delete", "source_path": "nested", "confirm_delete": True})
+        assert not (destination / "nested").exists()
+        assert (destination / "example.bin").read_bytes() == content
+
     finally:
         server.should_exit = True
         thread.join(timeout=10)

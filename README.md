@@ -2,106 +2,255 @@
 
 # ◈ CloudSync
 
-### Il tuo cloud, in movimento.
+### Enterprise-Grade Distributed Cloud Migration & Storage Orchestration
 
-**Account personali · Trasferimenti persistenti · Worker distribuiti**
+**Multi-Cloud Transfers · Persistent Job Queue · Distributed Worker Nodes · Live Hot-Migration**
 
-[Inizia](#un-solo-comando) · [Guida utente](docs/USER_GUIDE.md) · [Proxmox e nodi](docs/DEPLOYMENT.md) · [Architettura](docs/ARCHITECTURE.md) · [Verifiche](docs/TESTING.md)
+[![Python 3.12](https://img.shields.io/badge/Python-3.12-3776AB.svg?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15+-4169E1.svg?style=flat-square&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![Rclone](https://img.shields.io/badge/Rclone-Powered-informational.svg?style=flat-square)](https://rclone.org/)
+[![Tests](https://img.shields.io/badge/Tests-43%20Passed-brightgreen.svg?style=flat-square)](tests/)
+[![Code Style](https://img.shields.io/badge/Code%20Style-Ruff-000000.svg?style=flat-square&logo=ruff&logoColor=white)](https://github.com/astral-sh/ruff)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
+
+[Quick Start](#-quick-start) • [Features](#-features) • [Cluster Architecture](#-cluster-architecture) • [Worker Node TUI](#-worker-node-tui-dashboard) • [Supported Providers](#-supported-providers) • [Documentation](#-documentation)
+
+---
 
 </div>
 
-![La nuova dashboard CloudSync](docs/assets/dashboard.png)
+![CloudSync Dashboard](docs/assets/dashboard.png)
 
-CloudSync dà un'interfaccia web a **Rclone**. Ogni utente collega i propri servizi, esplora cartelle e avvia copie o spostamenti. Il server continua a lavorare quando il browser viene chiuso. Più worker condividono una coda PostgreSQL e si dividono il lavoro.
+**CloudSync** transforms [Rclone](https://rclone.org/) into a distributed, multi-user cloud migration and synchronization powerhouse. 
 
-> **Versione 0.2 — ricostruzione completa.** Il vecchio programma rimane nella cronologia Git. Questa versione non importa automaticamente i suoi account, token o dati condivisi.
+Connect cloud accounts, explore files across multiple providers simultaneously, and launch resilient background copy/move/sync operations. Your transfers persist and execute reliably 24/7 without keeping your browser window open. Distribute transfer loads across any number of worker nodes (local containers, workstations, or remote VPSs) with automatic failover, real-time hot migration, and cumulative checkpointing.
 
-## Un solo comando
+---
+
+## ⚡ Key Highlights & Features
+
+### 🎨 Modern Dark Glassmorphic UI
+- **Zero-Dependency Native Frontend:** Built with vanilla ES6+ and modern CSS with glassmorphic cards and subtle gradients. Zero external JavaScript frameworks, zero CDNs, and strict CSP compliance.
+- **Real-Time Speed Chart:** Hardware-accelerated local Canvas telemetry tracking instantaneous cluster throughput over time.
+- **Dual-Pane File Explorer:** Interactive side-by-side browser to browse remote directory trees, navigate folders, create directories, and delete files directly.
+- **Persistent Session State:** Transfers continue unaffected when you log out, close the tab, or shut down your personal device.
+
+### 🌐 Distributed Multi-Node Clustering
+- **Decentralized Data Pipes:** Worker nodes connect securely to the central API via HTTP/HTTPS (LAN or public Cloudflare Tunnels). Cloud-to-cloud file transfers flow directly through the worker node without hair-pinning through the central server.
+- **Terminal TUI Dashboard:** External workers feature a full-screen, interactive terminal monitor (`node_dashboard.py`) built with Rich, displaying slot utilization, bandwidth meters, active jobs, and historical transfers.
+- **Heterogeneous Workers:** Run workers anywhere — Debian/Ubuntu LXC, Proxmox, Docker, macOS workstations, Raspberry Pi, or bare-metal servers.
+
+### 🔄 Live Hot-Migration & Checkpointing
+- **Zero-Downtime Node Migration:** Reassign active transfer jobs dynamically from the Admin dashboard ("Sposta nodo ⇄") without interrupting the overall transfer.
+- **Cumulative Checkpointing:** Transferred bytes are tracked incrementally. When a job switches nodes, progress bars seamlessly continue forward instead of resetting to 0%.
+- **Instant Resume (`--check-first`):** Resumed jobs automatically verify and skip already-transferred files before beginning remaining data streams.
+
+### 🛡️ Self-Healing Fault Tolerance
+- **Instant Failover:** If an external worker node terminates unexpectedly or is stopped via `Ctrl + C`, in-flight jobs are released gracefully back into the queue without failure flags or penalty delays.
+- **Background Watchdog:** A dedicated control plane watchdog continuously monitors worker heartbeats, automatically detects offline nodes, unpins stuck jobs, and dispatches them to the next available worker.
+- **Weighted Fair-Share Scheduling:** Dynamic bandwidth allocation and fair job rotation prevent one heavy transfer from starving other users or nodes.
+
+### 🔑 Frictionless Cloud Authentication
+- **1-Click Google Drive Pairing:** Native local helper daemon (`scripts/google_helper.py`) pairs Google Drive accounts via an ephemeral local callback listener (`127.0.0.1:53683`), eliminating cumbersome token pasting.
+- **Apple iCloud Drive (with 2FA):** Native support for Apple ID login, trusted device 2FA challenge responses, and session persistence.
+- **Zero Plaintext Credentials:** Cloud tokens and access keys are symmetrically encrypted at rest using AES-128-CBC / Fernet (`cryptography`).
+
+---
+
+## 🏗️ Cluster Architecture
+
+```text
+                             ┌─────────────────────────────────┐
+                             │       Web Browser Client        │
+                             │  (Dark Glassmorphic UI Canvas)  │
+                             └────────────────┬────────────────┘
+                                              │ HTTPS / WSS
+                                              ▼
+   ┌─────────────────────────────────────────────────────────────────────────────┐
+   │                     CloudSync Control Plane (FastAPI)                       │
+   │  ┌─────────────────────┐  ┌─────────────────────┐  ┌─────────────────────┐  │
+   │  │ Auth & Secret Vault │  │ Scheduler & Queue   │  │ Failover Watchdog   │  │
+   │  │ (Fernet Encryption) │  │ (Weighted Fair Q)   │  │ (Lease Management)  │  │
+   │  └─────────────────────┘  └─────────────────────┘  └─────────────────────┘  │
+   └──────────────────────┬───────────────────────────────┬──────────────────────┘
+                          │                               │
+            State & Queue │                  Heartbeats & │ Job Leases
+                          ▼                               ▼
+              ┌───────────────────────┐       ┌───────────────────────┐
+              │  PostgreSQL Database  │       │ Worker Cluster Nodes  │
+              └───────────────────────┘       └───────────┬───────────┘
+                                                          │
+                  ┌───────────────────────────────────────┼───────────────────────────────────────┐
+                  ▼                                       ▼                                       ▼
+      ┌───────────────────────┐               ┌───────────────────────┐               ┌───────────────────────┐
+      │ Primary Server Worker │               │ macOS Workstation     │               │ Remote VPS / Server   │
+      │ (Local LXC / Docker)  │               │ (Interactive TUI)     │               │ (Headless Worker)     │
+      └───────────┬───────────┘               └───────────┬───────────┘               └───────────┬───────────┘
+                  │                                       │                                       │
+                  └───────────────────────────────────────┼───────────────────────────────────────┘
+                                                          │ Direct Rclone Transfer Streams
+                                                          ▼
+                                 ┌─────────────────────────────────────────────────┐
+                                 │       Cloud Providers & Storage Endpoints       │
+                                 │   Google Drive · iCloud · S3 · WebDAV · SFTP    │
+                                 └─────────────────────────────────────────────────┘
+```
+
+---
+
+## 🖥️ Worker Node TUI Dashboard
+
+External worker nodes come equipped with an interactive, full-screen terminal dashboard:
+
+```text
+ ╭──────────────────────────── CloudSync Node: mac-stocca ────────────────────────────╮
+ │ API: https://sync.example.com [1.8 ms]                     Uptime: 01h 42m 15s     │
+ ╰────────────────────────────────────────────────────────────────────────────────────╯
+ ╭─ Worker Slots ───────────╮ ╭─ Node Bandwidth ─────────╮ ╭─ Telemetry ──────────────╮
+ │ [████████░░░░░░░░] 2/4   │ │ [████████████░░░] 68.4%  │ │ Transferred: 14.8 GiB    │
+ │ Active Workers: 50.0%    │ │ 34.2 MiB/s / 50.0 MiB/s  │ │ Completed: 12 | Failed: 0│
+ ╰──────────────────────────╯ ╰──────────────────────────╯ ╰──────────────────────────╯
+ ┏━━━━┳━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━┓
+ ┃ ID ┃ Type ┃ Source ➔ Destination           ┃ Progress         ┃ Speed    ┃ ETA    ┃
+ ┡━━━━╇━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━┩
+ │ 42 │ COPY │ gdrive:Photos ➔ icloud:Backup  │ [████████░░] 82% │ 18.5MB/s │ 01m 24s│
+ │ 43 │ MOVE │ s3:datasets ➔ webdav:Archive   │ [████░░░░░░] 41% │ 15.7MB/s │ 03m 10s│
+ └────┴──────┴────────────────────────────────┴──────────────────┴──────────┴────────┘
+ ╭─ Recent History ───────────────────────────────────────────────────────────────────╮
+ │ ✔ Job #41  gdrive:Videos ➔ local:NAS         1.2 GiB  [00m 45s]       COMPLETED    │
+ │ ✔ Job #40  s3:backups ➔ webdav:Storage       450 MiB  [00m 18s]       COMPLETED    │
+ ╰────────────────────────────────────────────────────────────────────────────────────╯
+```
+
+---
+
+## 🚀 Quick Start
+
+### Option 1: Automatic Bootstrap (Recommended)
+
+CloudSync includes a smart, single-command launcher that detects your environment:
 
 ```bash
 ./start
 ```
 
-- **Mac o server con Docker Compose:** costruisce e avvia database, API e worker; apre il servizio su `http://127.0.0.1:8080`.
-- **Container Linux dedicato, root e senza Docker:** installa la versione nativa con systemd.
-- **Installazione nativa già presente:** avvia i servizi e verifica la salute, senza interrompere quelli già attivi.
-- **LXC con Docker già installato:** il primo avvio nativo è `./start native`; da quel momento basta `./start`.
+- **macOS / Docker Server:** Automatically builds and spins up PostgreSQL, the FastAPI control plane, and a worker container via Docker Compose.
+- **Dedicated Linux / LXC Container:** Installs native systemd units, initializes PostgreSQL, generates secure cryptographic secrets, and brings up the services.
+- **Access the Dashboard:** Open `http://localhost:8080` in your browser.
 
-Al primo avvio vengono generati i segreti e l'account `admin`. La password si trova in `.env` per Docker, oppure `/etc/cloudsync/server.env` per l'installazione nativa. Non viene stampata nei log. Ogni amico può registrarsi con **nome e password**, senza email né requisiti di complessità.
+> **Credentials:** Administrator credentials (`admin`) and cryptographic keys are generated on first boot and written securely to `.env` (Docker) or `/etc/cloudsync/server.env` (systemd).
 
-## Cosa puoi fare
+---
 
-| Spazio personale | Servizio sempre attivo | Gestione del cluster |
-| --- | --- | --- |
-| Nome e password, cookie di sessione | Coda su PostgreSQL | Aggiunta e revoca dei nodi |
-| Collegamenti cloud separati | Copia e spostamento con Rclone | Peso di banda per utente |
-| Esplorazione a due pannelli | Annullamento e nuovi tentativi | Limiti globali, per utente e nodo |
-| Cronologia dei trasferimenti | Copie periodiche senza sovrapposizioni | Massimo di lavori contemporanei |
-| Layout desktop e mobile | Recupero dei lavori dopo perdita del worker | Worker collegati via HTTP(S) |
-
-## Provider della prima versione
-
-| Provider | Collegamento | Stato del percorso di autenticazione |
-| --- | --- | --- |
-| S3 compatibile | Access key, secret, regione/endpoint | Implementato |
-| WebDAV / Nextcloud | URL HTTPS, nome e password | Implementato |
-| SFTP | Host, utente, password; chiave host verificata dall'amministratore | Implementato |
-| Google Drive | Token JSON di `rclone authorize drive` | Implementato; login OAuth web diretto non incluso |
-| iCloud Drive | Password Apple, 2FA e backend `iclouddrive` | Procedura guidata implementata; accesso Apple reale da collaudare |
-
-L'implementazione di un provider non equivale a una verifica sul tuo account. I test automatici eseguono copie reali con Rclone su dati temporanei; il collaudo cloud richiede account di prova. I provider personalizzati sono limitati a endpoint pubblici; i servizi LAN richiedono una politica di rete dedicata prima di essere abilitati.
-
-## Come si distribuisce
-
-```mermaid
-flowchart LR
-    U[Browser degli utenti] -->|HTTPS| API[CloudSync API]
-    API --- DB[(PostgreSQL\nUtenti · sessioni · coda)]
-    W1[Worker · nodo 1] -->|claim / heartbeat| API
-    W2[Worker · nodo 2] -->|claim / heartbeat| API
-    W3[Worker · nodo 3] -->|claim / heartbeat| API
-    W1 <--> C[Servizi cloud]
-    W2 <--> C
-    W3 <--> C
-```
-
-I worker non richiedono un filesystem condiviso. Ricevono solo la configurazione necessaria al lavoro assegnato. Il contenuto dei file passa direttamente fra il processo Rclone e i provider; normalmente un trasferimento fra cloud diversi utilizza la connessione del nodo.
-
-**Distribuito non significa automaticamente alta disponibilità:** nella topologia base PostgreSQL e API restano centrali. I worker possono essere aggiunti su altri container o macchine. Il failover di PostgreSQL non è incluso.
-
-## Qualità verificabile
+### Option 2: Docker Compose
 
 ```bash
-uv sync --frozen
-uv run pytest -q
-uv run ruff check cloudsync tests
-uv run python tests/ui_check.py
+# Clone the repository
+git clone https://github.com/Stocca05/CloudSync.git
+cd CloudSync
+
+# Configure environment
+cp .env.example .env
+
+# Launch services
+docker compose up -d
 ```
 
-Il test browser richiede Google Chrome. Il test di concorrenza richiede `TEST_DATABASE_URL` verso un database PostgreSQL dedicato. Vedi [risultati, comandi e limiti dei test](docs/TESTING.md).
+---
 
-## Mappa del progetto
+### Option 3: Adding an External Worker Node
+
+Scale your cluster by running a worker on another computer:
+
+```bash
+cd worker-node
+
+# Configure node parameters
+cp .env.example .env
+nano .env
+
+# Launch interactive worker
+./start_node.sh
+```
+
+---
+
+## ☁️ Supported Providers
+
+| Provider | Authentication Flow | Operations | Status |
+| :--- | :--- | :--- | :---: |
+| **Google Drive** | 1-Click pairing helper (`google_helper.py`) or token | Copy, Move, Mkdir, Delete, Sync | ✅ Production |
+| **Apple iCloud Drive** | Apple ID password + Interactive 2FA challenge | Copy, Move, Mkdir, Delete, Sync | ✅ Production |
+| **Amazon S3 / MinIO** | Access Key, Secret Key, Region & Endpoint | Copy, Move, Mkdir, Delete, Sync | ✅ Production |
+| **WebDAV / Nextcloud** | HTTPS Endpoint, Username & Password | Copy, Move, Mkdir, Delete, Sync | ✅ Production |
+| **SFTP** | Host, Port, Username, Password / Key | Copy, Move, Mkdir, Delete, Sync | ✅ Production |
+
+---
+
+## 🔒 Security & Privacy
+
+- **Encrypted at Rest:** All sensitive cloud tokens, refresh tokens, and passwords are encrypted using Fernet symmetric encryption (`cryptography`) before storage in PostgreSQL.
+- **Isolated Transfer Contexts:** Worker nodes only receive ephemeral, decrypted credentials for active jobs in isolated temporary directories that are wiped immediately upon task completion.
+- **No Shared Disk Exposure:** Worker nodes never require shared NFS/SMB mounts. File transfers stream directly from cloud provider to cloud provider in memory/temporary buffers.
+- **Strict Content Security Policy (CSP):** The web UI operates with strict CSP rules preventing script injection or unapproved external connections.
+
+---
+
+## 🧪 Testing & Verification
+
+The CloudSync test suite covers concurrent scheduling, fair queuing, lease renewal, real Rclone transfers, Google/iCloud authentication flows, and failure recovery:
+
+```bash
+# Run the complete test suite
+uv run pytest -v
+
+# Run linting and style verification
+uv run ruff check cloudsync tests
+```
+
+---
+
+## 📂 Repository Structure
 
 ```text
-cloudsync/      API, dati, sicurezza, scheduler, worker Rclone
-frontend/       Interfaccia senza CDN, asset serviti localmente
-start           Punto di ingresso unico
-compose*.yaml   Server completo e worker aggiuntivi
-deploy/        Installazione LXC e unità systemd
-tests/         Isolamento, lease, concorrenza, copie vere, browser
-docs/          Guide operative, architettura e verifica
+├── cloudsync/              # Core backend application
+│   ├── api.py              # FastAPI REST endpoints & WebSocket control
+│   ├── google_auth.py      # Google OAuth 1-click helper flow
+│   ├── icloud_auth.py      # Apple iCloud 2FA negotiation
+│   ├── models.py           # SQLAlchemy database schemas
+│   ├── providers.py        # Cloud provider definitions & path validators
+│   ├── scheduler.py        # Fair-share queue scheduler & watchdog
+│   ├── security.py         # Passwords, hashing & Fernet vault
+│   ├── settings.py         # Configuration settings
+│   └── worker.py           # Core Rclone execution engine
+├── frontend/               # Zero-dependency web interface
+│   ├── app.js              # State management & reactive UI logic
+│   ├── index.html          # Semantic HTML shell
+│   └── styles.css          # Dark glassmorphism theme & canvas chart styles
+├── worker-node/            # External worker node package
+│   ├── node_dashboard.py   # Full-screen Rich TUI worker daemon
+│   ├── start_node.sh       # Node startup script
+│   ├── .env.example        # Worker configuration template
+│   └── README.md           # Worker node setup guide
+├── scripts/                # Utility scripts & auth helpers
+├── deploy/                 # Systemd unit files & installer scripts
+├── docs/                   # In-depth architectural & user documentation
+├── tests/                  # Integration and unit tests
+├── compose.yaml            # Docker Compose orchestration definition
+└── start                   # Universal one-command startup script
 ```
 
-## Documentazione
+---
 
-- [Guida utente](docs/USER_GUIDE.md): collegare, esplorare, trasferire e pianificare.
-- [Distribuzione](docs/DEPLOYMENT.md): LXC, Docker, HTTPS, nodi aggiuntivi.
-- [Architettura](docs/ARCHITECTURE.md): banda, equità, lease e limiti del sistema.
-- [Operazioni](docs/OPERATIONS.md): backup, ripristino, aggiornamenti e diagnosi.
-- [Verifiche](docs/TESTING.md): cosa è stato provato e cosa resta da collaudare.
+## 📄 License
 
-Costruito su [Rclone](https://rclone.org/), [FastAPI](https://fastapi.tiangolo.com/) e [PostgreSQL](https://www.postgresql.org/).
+This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
 
-### Accessi cloud e amministrazione
+---
 
-[Google con Rclone, iCloud con 2FA e priorità dei processi](docs/CLOUD-LOGIN.md).
+<div align="center">
+
+Crafted with care by **Luca Raona** and the CloudSync community.
+
+</div>

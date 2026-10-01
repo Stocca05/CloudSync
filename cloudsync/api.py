@@ -636,7 +636,6 @@ def create_app(settings=None):
             if not target or not target.enabled:
                 raise HTTPException(400, "Nodo di destinazione non valido o disattivato")
 
-        old_node = job.node_id or "coda"
         curr_stats = dict(job.stats or {})
         prev_checkpoint = curr_stats.get("checkpoint_bytes", 0)
         current_run_bytes = curr_stats.get("bytes", 0)

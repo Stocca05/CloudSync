@@ -40,7 +40,8 @@ def safe_path(value: str) -> str:
         raise ValueError("Percorso non valido")
     if value.startswith("/") or ".." in PurePosixPath(value).parts or ":" in value:
         raise ValueError("Usa un percorso relativo al collegamento cloud")
-    return value.strip("/")
+    normalized = str(PurePosixPath(value))
+    return "" if normalized == "." else normalized
 
 
 def public_host(host: str):

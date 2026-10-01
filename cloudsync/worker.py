@@ -93,7 +93,7 @@ def command(job, config, port, log_path):
         source_name = Path(job.get("source_path", "")).name
         if not dest_path:
             dest_path = source_name
-        elif dest_path.endswith("/") or (not dest_path.endswith(source_name) and not ("." in Path(dest_path).name)):
+        elif dest_path.endswith("/") or (not dest_path.endswith(source_name) and "." not in Path(dest_path).name):
             dest_path = dest_path.rstrip("/") + "/" + source_name
         operation = "copyto" if operation == "copy" else "moveto"
     destination = "r" + job["destination_id"] + ":" + dest_path

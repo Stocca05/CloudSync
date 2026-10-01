@@ -20,7 +20,7 @@ La copia scaricata contiene già l’indirizzo del servizio, senza credenziali. 
 python3 scripts/google_helper.py --site https://cloud.example.org
 ```
 
-Il programma ascolta soltanto su `127.0.0.1:53683`, controlla Host e Origin, richiede conferma locale con nonce monouso e accetta un login Google alla volta per computer. I diversi computer possono autorizzarsi contemporaneamente. Il ticket di associazione dura dieci minuti, appartiene alla sessione CloudSync che lo ha richiesto, viene invalidato dal logout e può salvare un solo collegamento. Token e output Rclone non vengono scritti su disco o nei log; sul server il token è cifrato.
+Il programma ascolta soltanto su `127.0.0.1:53683`, controlla Host e Origin, richiede conferma locale con nonce monouso e accetta un login Google alla volta per computer. I diversi computer possono autorizzarsi contemporaneamente. Il ticket di associazione dura dieci minuti, appartiene alla sessione CloudSync che lo ha richiesto, viene invalidato dal logout e può salvare un solo collegamento. Una risposta HTTP persa può essere ritrasmessa senza duplicarlo. Il sito resta aperto e verifica sul server lo stato dell’autorizzazione. L’assistente rifiuta una richiesta destinata a un indirizzo diverso da quello configurato e mostra come aggiornarlo. Token e output Rclone non vengono scritti su disco o nei log; sul server il token è cifrato.
 
 Non è un login browser-only su dispositivi senza assistente, inclusi telefoni. Rclone segnala inoltre la dismissione del suo client condiviso durante il 2026: questo metodo dipende dalla sua disponibilità. La verifica di avvio ha confermato che Rclone genera l’URL Google con il client condiviso, ma non sostituisce il consenso reale dell’account.
 
@@ -57,3 +57,7 @@ La prova completa con un account Apple reale richiede l’intervento del titolar
 La pagina **Amministrazione** mostra i lavori di tutti gli utenti, inclusi accessi cloud e letture cartelle, con filtro di stato e pagine da 100 elementi. L’amministratore vede utente, nodo, byte, velocità e quota assegnata; può interrompere un lavoro e cambiare la sua priorità.
 
 La priorità bassa/normale/alta corrisponde a pesi 1/2/3 nella suddivisione della banda tra lavori attivi dello stesso utente e sul nodo. Le quote globali, per utente e per nodo restano rispettate. In coda ordina i lavori dello stesso utente, mantenendo la rotazione equa tra utenti. La nuova quota viene applicata al successivo heartbeat del worker; non è una modifica della priorità CPU Linux.
+
+### Se il tunnel cambia indirizzo
+
+Aggiornare `PUBLIC_URL` sul server e l’argomento `--site` dell’assistente locale. Sul Mac installato aggiornare `~/Library/LaunchAgents/it.cloudsync.google-helper.plist` e ricaricare il LaunchAgent. Gli assistenti scaricati prima del cambio conservano il vecchio indirizzo: scaricarli nuovamente. Il flusso rileva ora questa differenza prima di richiedere credenziali Google. Un dominio stabile evita questo problema.
