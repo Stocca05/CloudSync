@@ -88,9 +88,15 @@ def command(job, config, port, log_path):
     if job["operation"] == "delete":
         return ["rclone", "deletefile" if job.get("is_file") else "purge", source, *common]
     operation = job["operation"]
-    if job["is_file"]:
+    dest_path = (job.get("destination_path") or "").strip()
+    if job.get("is_file"):
+        source_name = Path(job.get("source_path", "")).name
+        if not dest_path:
+            dest_path = source_name
+        elif dest_path.endswith("/") or (not dest_path.endswith(source_name) and not ("." in Path(dest_path).name)):
+            dest_path = dest_path.rstrip("/") + "/" + source_name
         operation = "copyto" if operation == "copy" else "moveto"
-    destination = "r" + job["destination_id"] + ":" + job["destination_path"]
+    destination = "r" + job["destination_id"] + ":" + dest_path
     return ["rclone", operation, source, destination, *common]
 
 
@@ -237,11 +243,26 @@ def run_job(api_url, token, job):
                 }
                 if values:
                     refreshed[remote_id] = {"revision": data["revision"], **values}
-            error = (
-                ""
-                if success or cancelled
-                else f"Rclone terminato con codice {process.returncode}. Controlla credenziali, permessi e percorso; per SFTP verifica la chiave host sul nodo."
-            )
+            error = ""
+            if not success and not cancelled:
+                err_msgs = []
+                if log_path.exists():
+                    try:
+                        with log_path.open("r", encoding="utf-8", errors="ignore") as lf:
+                            for line in lf:
+                                try:
+                                    rec = json.loads(line)
+                                    if rec.get("level") == "error" and rec.get("msg"):
+                                        err_msgs.append(rec["msg"])
+                                except Exception:
+                                    pass
+                    except Exception:
+                        pass
+                if err_msgs:
+                    detail = "; ".join(err_msgs[-2:])
+                    error = f"Errore Rclone (codice {process.returncode}): {detail}"
+                else:
+                    error = f"Rclone terminato con codice {process.returncode}. Controlla credenziali e percorso."
             completion = {
                 **payload,
                 "success": success,
