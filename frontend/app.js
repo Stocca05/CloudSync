@@ -208,8 +208,7 @@ document.getElementById('mkdir-destination').onclick = () => guard(() => handleM
 
 
 async function handleDelete(side, targetPath, isDir) {
-  if (!confirm('Vuoi davvero eliminare ' + (isDir ? 'la cartella' : 'il file') + ' ' + targetPath + '?
-Questa operazione è irreversibile.')) return;
+  if (!confirm('Vuoi davvero eliminare ' + (isDir ? 'la cartella' : 'il file') + ' ' + targetPath + '?\nQuesta operazione è irreversibile.')) return;
   const id = document.getElementById(side+'-remote').value;
   toast('Eliminazione in corso...');
   try {
