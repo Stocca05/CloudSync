@@ -82,6 +82,10 @@ def command(job, config, port, log_path):
     ]
     if job["operation"] == "list":
         return ["rclone", "lsjson", source, "--no-mimetype", "--no-modtime", *common]
+    if job["operation"] == "mkdir":
+        return ["rclone", "mkdir", source, *common]
+    if job["operation"] == "delete":
+        return ["rclone", "deletefile" if job.get("is_file") else "purge", source, *common]
     operation = job["operation"]
     if job["is_file"]:
         operation = "copyto" if operation == "copy" else "moveto"
