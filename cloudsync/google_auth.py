@@ -17,11 +17,20 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from .models import GoogleAuthorization, LoginSession, Remote, User
+from .scheduler import lock_scheduler
 from .security import digest
 
 
 class RcloneToken(BaseModel):
     token: dict
+
+
+class GooglePoll(BaseModel):
+    ticket: str = Field(min_length=40, max_length=100)
+
+
+class GoogleFailure(BaseModel):
+    reason: str = Field(default="authorization", max_length=30)
 
 
 class GoogleStart(BaseModel):
@@ -92,7 +101,9 @@ def install_google_routes(app, settings, vault, get_db, current_user):
             )
             db.commit()
             return {
-                "url": "http://127.0.0.1:53683/connect?" + urlencode({"ticket": state}),
+                "url": "http://127.0.0.1:53683/connect?"
+                + urlencode({"ticket": state, "site": settings.public_url.rstrip("/")}),
+                "ticket": state,
                 "method": "rclone",
             }
         db.execute(
@@ -150,8 +161,7 @@ def install_google_routes(app, settings, vault, get_db, current_user):
             raise HTTPException(401, "Autorizzazione scaduta")
         return {"username": user.username, "name": pending.name}
 
-    @app.post("/api/google/rclone/complete")
-    def rclone_complete(data: RcloneToken, request: Request, db: Session = Depends(get_db)):
+    def pairing(request, db):
         ticket = request.headers.get("authorization", "").removeprefix("Bearer ")
         pending = db.get(GoogleAuthorization, digest(ticket))
         session = db.get(LoginSession, pending.session_hash) if pending else None
@@ -163,25 +173,71 @@ def install_google_routes(app, settings, vault, get_db, current_user):
             or session.expires < time.time()
             or not user
             or not user.enabled
-            or vault.decrypt(pending.encrypted_data).get("mode") != "rclone"
         ):
             raise HTTPException(401, "Autorizzazione scaduta. Riparti dal sito.")
+        return pending, user, vault.decrypt(pending.encrypted_data)
+
+    @app.post("/api/google/progress")
+    def progress(
+        data: GooglePoll, request: Request, user=Depends(current_user), db: Session = Depends(get_db)
+    ):
+        pending = db.get(GoogleAuthorization, digest(data.ticket))
+        if (
+            not pending
+            or pending.user_id != user.id
+            or pending.session_hash != digest(request.cookies.get("session", ""))
+        ):
+            raise HTTPException(404, "Richiesta non trovata")
+        if pending.expires < time.time():
+            return {"status": "expired"}
+        details = vault.decrypt(pending.encrypted_data)
+        return {"status": details.get("status", "waiting"), "reason": details.get("reason", "")}
+
+    @app.post("/api/google/rclone/failed")
+    def failed(data: GoogleFailure, request: Request, db: Session = Depends(get_db)):
+        lock_scheduler(db)
+        pending, user, details = pairing(request, db)
+        if details.get("mode") != "rclone":
+            raise HTTPException(400, "Metodo errato")
+        if details.get("status") != "connected":
+            reason = (
+                data.reason
+                if data.reason in {"authorization", "port_busy", "timeout", "upload", "shared_client"}
+                else "authorization"
+            )
+            pending.encrypted_data = vault.encrypt({"mode": "rclone", "status": "failed", "reason": reason})
+            db.commit()
+        return {"ok": True}
+
+    @app.post("/api/google/rclone/complete")
+    def rclone_complete(data: RcloneToken, request: Request, db: Session = Depends(get_db)):
+        lock_scheduler(db)
+        pending, user, details = pairing(request, db)
+        if details.get("mode") != "rclone":
+            raise HTTPException(400, "Metodo errato")
+        if details.get("status") == "connected":
+            return {"ok": True}  # A lost HTTP response can be retried without duplicating the remote.
+        if details.get("status") == "failed":
+            raise HTTPException(409, "Accesso già terminato: riprova dal sito")
         token = {
             key: data.token[key]
             for key in ["access_token", "refresh_token", "token_type", "expiry", "expires_in"]
             if key in data.token
         }
         if not all(
-            isinstance(token.get(key), str) and token[key] for key in ["access_token", "refresh_token"]
+            isinstance(token.get(key), str) and 0 < len(token[key]) < 16000
+            for key in ["access_token", "refresh_token"]
         ):
             raise HTTPException(400, "Autorizzazione Google incompleta")
-        consumed = db.execute(
-            delete(GoogleAuthorization)
-            .where(GoogleAuthorization.state_hash == pending.state_hash)
-            .returning(GoogleAuthorization.state_hash)
-        ).scalar_one_or_none()
-        if not consumed:
-            raise HTTPException(409, "Autorizzazione già usata")
+        if (
+            db.scalar(
+                select(func.count())
+                .select_from(Remote)
+                .where(Remote.user_id == user.id, Remote.enabled.is_(True))
+            )
+            >= 30
+        ):
+            raise HTTPException(409, "Limite di collegamenti raggiunto")
         db.add(
             Remote(
                 user_id=user.id,
@@ -192,6 +248,7 @@ def install_google_routes(app, settings, vault, get_db, current_user):
                 ),
             )
         )
+        pending.encrypted_data = vault.encrypt({"mode": "rclone", "status": "connected"})
         db.commit()
         return {"ok": True}
 
@@ -219,6 +276,8 @@ def install_google_routes(app, settings, vault, get_db, current_user):
         payload = vault.decrypt(pending.encrypted_data)
         name = pending.name
         db.commit()  # Consume before exchanging; another callback cannot replay this state.
+        if payload.get("mode") == "rclone":
+            return RedirectResponse("/?google=expired", status_code=303)
         if error or not code:
             return RedirectResponse("/?google=cancelled", status_code=303)
         try:

@@ -134,7 +134,7 @@ def test_rclone_pairing_single_use_bound_to_owner(client, app):
             headers=headers,
             json={"token": {"access_token": "access", "refresh_token": "refresh"}},
         ).status_code
-        == 401
+        == 200
     )
     with app.state.factory() as db:
         remote = db.scalar(select(Remote))
@@ -151,3 +151,20 @@ def test_rclone_pairing_revoked_on_logout(client, app):
         client.get("/api/google/rclone/check", headers={"Authorization": "Bearer " + ticket}).status_code
         == 401
     )
+
+
+def test_rclone_progress_is_session_bound_and_reports_failure(client, app):
+    login(client)
+    result = client.post("/api/google/start", json={"name": "Drive"}).json()
+    assert (
+        client.post("/api/google/progress", json={"ticket": result["ticket"]}).json()["status"] == "waiting"
+    )
+    headers = {"Authorization": "Bearer " + result["ticket"]}
+    assert (
+        client.post("/api/google/rclone/failed", headers=headers, json={"reason": "port_busy"}).status_code
+        == 200
+    )
+    progress = client.post("/api/google/progress", json={"ticket": result["ticket"]}).json()
+    assert progress == {"status": "failed", "reason": "port_busy"}
+    login(client)
+    assert client.post("/api/google/progress", json={"ticket": result["ticket"]}).status_code == 404

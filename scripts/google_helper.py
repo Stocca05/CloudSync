@@ -10,12 +10,13 @@ import re
 import secrets
 import shutil
 import subprocess
+import tempfile
 import threading
 import time
 import urllib.parse
 import urllib.request
-import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 
 LOCAL = "http://127.0.0.1:53683"
 
@@ -35,6 +36,7 @@ def serve(site, rclone):
     active = threading.Lock()
     pending = {}
     pending_lock = threading.Lock()
+    results = {}
 
     def call(path, ticket, body=None):
         headers = {
@@ -48,17 +50,36 @@ def serve(site, rclone):
         with urllib.request.urlopen(request, timeout=25) as response:
             return json.load(response)
 
-    def authorize(ticket, ready):
+    def authorize(ticket, ready, result_id):
         process = None
         timer = None
+        temp = tempfile.TemporaryDirectory(prefix="cloudsync-google-")
+        reason = "authorization"
         try:
             env = {
                 key: value
                 for key, value in os.environ.items()
                 if key in {"PATH", "HOME", "TMPDIR", "SSL_CERT_FILE", "SSL_CERT_DIR", "LANG"}
             }
+            template = Path(temp.name) / "result.html"
+            template.write_text(
+                '<!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="0;url='
+                + LOCAL
+                + "/result?id="
+                + result_id
+                + '"><p>Verifica del collegamento CloudSync…</p>'
+            )
             process = subprocess.Popen(
-                [rclone, "authorize", "drive", "--auth-no-open-browser", "--config", os.devnull],
+                [
+                    rclone,
+                    "authorize",
+                    "drive",
+                    "--auth-no-open-browser",
+                    "--config",
+                    os.devnull,
+                    "--template",
+                    str(template),
+                ],
                 stdin=subprocess.DEVNULL,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
@@ -71,6 +92,11 @@ def serve(site, rclone):
             announced = False
             for line in process.stdout:
                 output.append(line)
+                lower = line.lower()
+                if "address already in use" in lower:
+                    reason = "port_busy"
+                elif "invalid_client" in lower or "unauthorized_client" in lower:
+                    reason = "shared_client"
                 match = re.search(r"http://127\.0\.0\.1:53682/auth\?[^\s]+", line)
                 if match and not announced:
                     ready.put(match.group(0))
@@ -80,19 +106,32 @@ def serve(site, rclone):
             if process.wait() != 0:
                 raise ValueError("Rclone non ha completato l’accesso")
             token = extract_token("".join(output))
-            call("/api/google/rclone/complete", ticket, {"token": token})
-            webbrowser.open(site + "/?google=connected")
+            reason = "upload"
+            for attempt in range(3):
+                try:
+                    call("/api/google/rclone/complete", ticket, {"token": token})
+                    break
+                except Exception:
+                    if attempt == 2:
+                        raise
+                    time.sleep(1)
+            results[result_id] = ("connected", "")
         except Exception:
             # Do not log raw OAuth errors: they may contain tokens and codes.
             if ready.empty():
                 ready.put(None)
-            webbrowser.open(site + "/?google=failed")
+            results[result_id] = ("failed", reason)
+            try:
+                call("/api/google/rclone/failed", ticket, {"reason": reason})
+            except Exception:
+                pass
         finally:
             if timer:
                 timer.cancel()
             if process and process.poll() is None:
                 process.terminate()
                 process.wait(timeout=10)
+            temp.cleanup()
             active.release()
 
     class Handler(BaseHTTPRequestHandler):
@@ -118,17 +157,41 @@ def serve(site, rclone):
             self.wfile.write(body)
 
         def valid_host(self):
-            return self.headers.get("Host") == "127.0.0.1:53683"
+            return self.headers.get("Host") == urllib.parse.urlsplit(LOCAL).netloc
 
         def do_GET(self):
             if not self.valid_host():
                 self.send_error(403)
                 return
             url = urllib.parse.urlsplit(self.path)
+            if url.path == "/result":
+                result_id = urllib.parse.parse_qs(url.query).get("id", [""])[0]
+                status, reason = results.get(result_id, ("missing", ""))
+                if status == "waiting":
+                    self.page(
+                        "Autorizzazione ricevuta. Sto salvando il collegamento sul server…",
+                        '<meta http-equiv="refresh" content="2">',
+                    )
+                elif status == "connected":
+                    self.page(
+                        "Google Drive è collegato. Torna alla scheda CloudSync: il collegamento è già disponibile."
+                    )
+                else:
+                    self.page("Accesso non completato. Torna a CloudSync per riprovare. Dettaglio: " + reason)
+                return
             if url.path != "/connect":
                 self.page("Assistente Rclone pronto. Inizia da Collegamenti sul sito CloudSync.")
                 return
-            ticket = urllib.parse.parse_qs(url.query).get("ticket", [""])[0]
+            query = urllib.parse.parse_qs(url.query)
+            expected_site = query.get("site", [site])[0].rstrip("/")
+            if expected_site != site:
+                self.page(
+                    "L’indirizzo CloudSync è cambiato. Questo assistente è configurato per "
+                    + site
+                    + ". Scarica l’assistente aggiornato dal sito e riavvialo prima di accedere. Nessuna credenziale Google è stata richiesta."
+                )
+                return
+            ticket = query.get("ticket", [""])[0]
             if not re.fullmatch(r"[A-Za-z0-9_-]{40,100}", ticket):
                 self.send_error(400)
                 return
@@ -182,7 +245,10 @@ def serve(site, rclone):
                 )
                 return
             ready = queue.Queue()
-            threading.Thread(target=authorize, args=(item[0], ready), daemon=True).start()
+            result_id = secrets.token_urlsafe(24)
+            results.clear()
+            results[result_id] = ("waiting", "")
+            threading.Thread(target=authorize, args=(item[0], ready, result_id), daemon=True).start()
             try:
                 url = ready.get(timeout=25)
             except queue.Empty:
@@ -197,7 +263,7 @@ def serve(site, rclone):
             self.send_header("Referrer-Policy", "no-referrer")
             self.end_headers()
 
-    ThreadingHTTPServer(("127.0.0.1", 53683), Handler).serve_forever()
+    ThreadingHTTPServer(("127.0.0.1", urllib.parse.urlsplit(LOCAL).port), Handler).serve_forever()
 
 
 if __name__ == "__main__":
