@@ -41,6 +41,7 @@ class JobInput(BaseModel):
     is_file: bool = False
     priority: int = Field(default=0, ge=0, le=2)
     confirm_move: bool = False
+    confirm_delete: bool = False
 
 
 class ScheduleInput(BaseModel):
@@ -94,7 +95,7 @@ def create_app(settings=None):
     settings = settings or Settings()
     if not settings.database_url or not settings.encryption_key:
         raise RuntimeError("DATABASE_URL ed ENCRYPTION_KEY richiesti. Avvia con ./start")
-    engine = create_engine(settings.database_url, pool_pre_ping=True)
+    engine = create_engine(settings.database_url, pool_pre_ping=True, pool_size=20, max_overflow=20, pool_timeout=30, pool_recycle=1800)
     factory = sessionmaker(engine, expire_on_commit=False)
     vault = Vault(settings.encryption_key)
 
@@ -221,7 +222,7 @@ def create_app(settings=None):
             "trust_token"
         ):
             raise HTTPException(409, "Completa prima la connessione iCloud e il codice 2FA")
-        if spec.operation != "list":
+        if spec.operation in {"copy", "move"}:
             destination_remote = owned(db, Remote, spec.destination_id, user)
             if destination_remote.provider == "iclouddrive" and not vault.decrypt(
                 destination_remote.encrypted_config
@@ -236,10 +237,21 @@ def create_app(settings=None):
             destination = safe_path(spec.destination_path)
         except ValueError as exc:
             raise HTTPException(400, str(exc)) from exc
-        if spec.is_file and (not source or not destination):
+        if spec.operation in {"mkdir", "delete"}:
+            if not source:
+                raise HTTPException(
+                    400, "Indica una cartella o un file: la radice del cloud non può essere modificata"
+                )
+            if spec.destination_id or destination:
+                raise HTTPException(400, "Questa operazione richiede solo il percorso sorgente")
+            if spec.operation == "delete" and not spec.confirm_delete:
+                raise HTTPException(400, "Conferma esplicitamente l’eliminazione del percorso selezionato")
+            if spec.operation == "mkdir" and spec.is_file:
+                raise HTTPException(400, "La creazione cartella non accetta un file")
+        if spec.operation in {"copy", "move"} and spec.is_file and (not source or not destination):
             raise HTTPException(400, "Indica il nome del file sorgente e destinazione")
         return {
-            **spec.model_dump(exclude={"confirm_move"}),
+            **spec.model_dump(exclude={"confirm_move", "confirm_delete"}),
             "source_path": source,
             "destination_path": destination,
         }
@@ -493,6 +505,8 @@ def create_app(settings=None):
         job = owned(db, Job, job_id, user)
         if job.status not in {"failed", "cancelled"}:
             raise HTTPException(409, "Il lavoro non può essere riavviato")
+        for remote_id in {job.source_id, job.destination_id} - {None}:
+            owned(db, Remote, remote_id, user)
         job.status = "queued"
         job.attempts = 0
         job.cancel_requested = False
