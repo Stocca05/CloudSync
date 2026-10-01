@@ -2,8 +2,12 @@
 <html lang="it">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="theme-color" content="#090d16">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#070a12">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="CloudSync">
+  <meta name="format-detection" content="telephone=no">
   <title>CloudSync — Distributed Cloud Transfer & Sync</title>
   <link rel="stylesheet" href="/assets/styles.css">
   <script type="module" src="/assets/app.js"></script>
@@ -26,6 +30,10 @@
     <small>Architettura distribuita multi-nodo · Crittografia end-to-end · Zero dipendenze esterne</small>
   </div>
   <div class="auth-panel">
+    <div class="auth-mobile-brand">
+      <a class="brand" href="/">◈ <span>CloudSync</span></a>
+      <span class="eyebrow">IL TUO CLOUD DISTRIBUITO</span>
+    </div>
     <form id="login-form">
       <span class="eyebrow">BENTORNATO</span>
       <h2>Entra nel tuo spazio</h2>
@@ -70,14 +78,18 @@
   <main>
     <header>
       <div class="header-left">
-        <span class="eyebrow">WORKSPACE DISTRIBUITO</span>
-        <p id="welcome">Caricamento...</p>
+        <a class="mobile-brand" href="/">◈ <span>CloudSync</span></a>
+        <div class="header-user-info">
+          <span class="eyebrow">WORKSPACE DISTRIBUITO</span>
+          <p id="welcome">Caricamento...</p>
+        </div>
       </div>
       <div class="header-right">
         <div class="cluster-pill" id="cluster-status-pill">
           <span class="live-dot"></span>
           <span id="header-cluster-text">Cluster attivo</span>
         </div>
+        <button id="mobile-logout" class="mobile-logout-btn" title="Esci dall'account" aria-label="Disconnetti">⎋</button>
         <div class="avatar" id="avatar" title="Account utente">U</div>
       </div>
     </header>

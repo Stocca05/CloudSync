@@ -209,13 +209,15 @@ $('register').onclick = async () => {
   }
 };
 
-$('logout').onclick = () => guard(async () => {
+const doLogout = () => guard(async () => {
   await post('/auth/logout');
   clearInterval(timer);
   state.user = null;
   $('shell').hidden = true;
   $('auth').hidden = false;
 });
+if ($('logout')) $('logout').onclick = doLogout;
+if ($('mobile-logout')) $('mobile-logout').onclick = doLogout;
 
 async function page(name) {
   state.page = name;
@@ -317,6 +319,12 @@ function updateChart(speedBytes) {
   ctx.lineWidth = 1.5;
   ctx.stroke();
 }
+
+window.addEventListener('resize', () => {
+  if (state.page === 'overview' && speedHistory.length) {
+    updateChart(speedHistory[speedHistory.length - 1]);
+  }
+});
 
 // Jobs Search & Filter Tabs
 if ($('job-search')) {
@@ -1142,19 +1150,24 @@ async function loadAdmin(full = true) {
   users.replaceChildren();
   for (const u of data.users) {
     const row = el('div', 'panel user-row');
+    const uInfo = el('div', 'user-info');
     const uTitle = el('h3', '', u.username);
     if (u.admin) uTitle.append(el('span', 'badge running', 'ADMIN'));
-    row.append(uTitle);
+    uInfo.append(uTitle);
 
-    row.append(
-      el('span', 'muted', `Peso: ${u.weight}`),
-      el('span', 'muted', `Max lavori: ${u.max_jobs}`),
-      el('span', 'muted', `Quota: ${u.bandwidth_bps ? bytes(u.bandwidth_bps) + '/s' : 'Illimitata'}`),
+    const uMeta = el('div', 'user-meta');
+    uMeta.append(
+      el('span', 'meta-pill', `Peso: ${u.weight}`),
+      el('span', 'meta-pill', `Max: ${u.max_jobs} slot`),
+      el('span', 'meta-pill', `Quota: ${u.bandwidth_bps ? bytes(u.bandwidth_bps) + '/s' : 'Illimitata'}`),
       el('span', 'badge ' + (u.enabled ? 'completed' : 'cancelled'), u.enabled ? 'Attivo' : 'Sospeso')
     );
 
-    const editBtn = button('Modifica utente', () => openEditUser(u), 'secondary');
-    row.append(editBtn);
+    const uActions = el('div', 'user-actions');
+    const editBtn = button('Modifica', () => openEditUser(u), 'secondary');
+    uActions.append(editBtn);
+
+    row.append(uInfo, uMeta, uActions);
     users.append(row);
   }
 
